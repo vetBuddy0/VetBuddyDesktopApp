@@ -140,9 +140,9 @@ ipcMain.handle("screen:paste-at", async (_, { x, y }: { x: number; y: number }) 
     `tell application "System Events"`,
     `  click at {${Math.round(x)}, ${Math.round(y)}}`,
     `  delay 0.3`,
-    `  key stroke "a" using command down`,
+    `  keystroke "a" using command down`,
     `  delay 0.1`,
-    `  key stroke "v" using command down`,
+    `  keystroke "v" using command down`,
     `end tell`,
   ].join("\n");
   return new Promise((resolve) => {
