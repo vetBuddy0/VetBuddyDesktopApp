@@ -7,9 +7,10 @@ import { SOAPNoteList } from "./components/SOAPNoteList";
 import { SOAPNoteGenerator } from "./components/SOAPNoteGenerator";
 import { TemplateManager } from "./components/TemplateManager";
 import { EzyVetSettings } from "./components/EzyVetSettings";
+import { PasteLab } from "./components/PasteLab";
 import { logout } from "./authService";
 import { getUIState, setUIState, clearUIState } from "./stateStorage";
-import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings } from "lucide-react";
+import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings, Zap } from "lucide-react";
 import type { EzyVetPrefillData } from "./types/patient";
 
 type View =
@@ -20,6 +21,7 @@ type View =
   | "recording"
   | "notes"
   | "templates"
+  | "paste-lab"
   | "ezyvet-settings";
 
 export default function App() {
@@ -99,7 +101,7 @@ export default function App() {
     }
   };
 
-  const isMainView = ["patients", "consultations", "notes", "templates"].includes(currentView);
+  const isMainView = ["patients", "consultations", "notes", "templates", "paste-lab"].includes(currentView);
 
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (isCheckingAuth) {
@@ -235,6 +237,13 @@ export default function App() {
               <FileEdit size={13} />
               Templates
             </button>
+            <button
+              onClick={() => setCurrentView("paste-lab")}
+              className={`tab ${currentView === "paste-lab" ? "tab-active" : ""}`}
+            >
+              <Zap size={13} />
+              Paste Lab
+            </button>
           </div>
         </div>
       )}
@@ -315,6 +324,9 @@ export default function App() {
 
         {/* Templates */}
         {currentView === "templates" && <TemplateManager />}
+
+        {/* Paste Lab */}
+        {currentView === "paste-lab" && <PasteLab />}
 
         {/* ezyVet Settings */}
         {currentView === "ezyvet-settings" && (

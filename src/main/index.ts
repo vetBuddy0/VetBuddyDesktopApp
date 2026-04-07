@@ -1,5 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, shell, desktopCapturer } from "electron";
 import { join } from "path";
+import { exec } from "child_process";
+import { writeFileSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
 import { is } from "@electron-toolkit/utils";
 
 let mainWindow: BrowserWindow | null = null;
@@ -46,20 +49,84 @@ function createWindow(): void {
   }
 }
 
-// Window control IPC handlers
+// ── Window controls ─────────────────────────────────────────────────────────
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
 ipcMain.on("window:close", () => mainWindow?.close());
 
-// Toggle always-on-top
 ipcMain.on("window:toggle-pin", (_, pinned: boolean) => {
   mainWindow?.setAlwaysOnTop(pinned, "floating");
 });
 
-// Opacity control
 ipcMain.on("window:set-opacity", (_, value: number) => {
   mainWindow?.setOpacity(value);
 });
 
+// ── Screen capture ───────────────────────────────────────────────────────────
+// Returns base64 data URL of the primary screen at 1920×1080 (or native res)
+ipcMain.handle("screen:capture", async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: { width: 2560, height: 1440 },
+    });
+    if (!sources.length) return null;
+    // Use first (primary) screen
+    return sources[0].thumbnail.toDataURL();
+  } catch (err) {
+    console.error("screen:capture failed:", err);
+    return null;
+  }
+});
+
+// ── Smart paste at screen coordinate (macOS via AppleScript) ─────────────────
+// text is already in clipboard when this is called; just clicks + Cmd+V
+ipcMain.handle("screen:paste-at", async (_, { x, y }: { x: number; y: number }) => {
+  if (process.platform !== "darwin") {
+    // Windows/Linux: use xdotool or similar — stub for now
+    return { success: false, error: "Auto-paste only supported on macOS currently." };
+  }
+
+  const script = [
+    `tell application "System Events"`,
+    `  click at {${Math.round(x)}, ${Math.round(y)}}`,
+    `  delay 0.3`,
+    `  key stroke "a" using command down`,
+    `  delay 0.1`,
+    `  key stroke "v" using command down`,
+    `end tell`,
+  ].join("\n");
+
+  return new Promise((resolve) => {
+    exec(`osascript << 'APPLESCRIPT'\n${script}\nAPPLESCRIPT`, (err) => {
+      if (err) {
+        console.error("screen:paste-at AppleScript error:", err.message);
+        resolve({ success: false, error: err.message });
+      } else {
+        resolve({ success: true });
+      }
+    });
+  });
+});
+
+// ── Copy text to clipboard via pbcopy (macOS) ────────────────────────────────
+ipcMain.handle("clipboard:write", async (_, text: string) => {
+  if (process.platform !== "darwin") return { success: false };
+  const tmp = join(tmpdir(), `vb_${Date.now()}.txt`);
+  try {
+    writeFileSync(tmp, text, "utf8");
+    await new Promise<void>((resolve, reject) => {
+      exec(`cat "${tmp}" | pbcopy`, (err) => {
+        try { unlinkSync(tmp); } catch { /* ignore */ }
+        err ? reject(err) : resolve();
+      });
+    });
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createWindow();
 
