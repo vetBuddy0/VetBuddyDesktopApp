@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, desktopCapturer } from "electron";
+import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut } from "electron";
 import { join } from "path";
 import { exec } from "child_process";
 import { writeFileSync, unlinkSync } from "fs";
@@ -126,13 +126,63 @@ ipcMain.handle("clipboard:write", async (_, text: string) => {
   }
 });
 
+// ── IPC: navigate to a tab from renderer shortcut ───────────────────────────
+ipcMain.on("nav:go", (_, view: string) => {
+  mainWindow?.webContents.send("nav:go", view);
+});
+
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createWindow();
 
+  // ── Global shortcuts (work even when app is not focused) ──────────────────
+  // Show / hide overlay
+  globalShortcut.register("CommandOrControl+Shift+Space", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isVisible()) {
+      mainWindow.hide();
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // Minimise / restore
+  globalShortcut.register("CommandOrControl+Shift+M", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    } else {
+      mainWindow.minimize();
+    }
+  });
+
+  // Global tab switchers (Cmd+Shift+1..5)
+  const tabKeys: [string, string][] = [
+    ["CommandOrControl+Shift+1", "consultations"],
+    ["CommandOrControl+Shift+2", "patients"],
+    ["CommandOrControl+Shift+3", "notes"],
+    ["CommandOrControl+Shift+4", "templates"],
+    ["CommandOrControl+Shift+5", "paste-lab"],
+  ];
+  for (const [key, view] of tabKeys) {
+    globalShortcut.register(key, () => {
+      if (!mainWindow) return;
+      if (!mainWindow.isVisible()) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+      mainWindow.webContents.send("nav:go", view);
+    });
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {

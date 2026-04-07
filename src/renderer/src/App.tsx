@@ -52,6 +52,40 @@ export default function App() {
     (window as any).electron?.setOpacity(opacity);
   }, [opacity]);
 
+  // ── Global shortcut nav from main process ───────────────────────────────────
+  useEffect(() => {
+    const el = window as any;
+    const cleanup = el.electron?.onNavigate?.((view: string) => {
+      if (isLoggedIn) setCurrentView(view as View);
+    });
+    return () => cleanup?.();
+  }, [isLoggedIn]);
+
+  // ── Local keyboard shortcuts (app focused) ───────────────────────────────────
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const map: Record<string, View> = {
+        "1": "consultations",
+        "2": "patients",
+        "3": "notes",
+        "4": "templates",
+        "5": "paste-lab",
+      };
+      if (map[e.key]) {
+        e.preventDefault();
+        setCurrentView(map[e.key]);
+      }
+      // Cmd+W → close, Cmd+M → minimise (local, without Shift)
+      if (e.key === "w") { e.preventDefault(); (window as any).electron?.close(); }
+      if (e.key === "m") { e.preventDefault(); (window as any).electron?.minimize(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isLoggedIn]);
+
   // ── Auth check ──────────────────────────────────────────────────────────────
   const checkAuthState = useCallback(() => {
     const token = localStorage.getItem("vetbuddy_token");

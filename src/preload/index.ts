@@ -18,4 +18,11 @@ contextBridge.exposeInMainWorld("electron", {
   // Write text to system clipboard via pbcopy (avoids renderer clipboard limitations)
   writeClipboard: (text: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke("clipboard:write", text),
+
+  // Listen for navigation events from main process (global shortcuts)
+  onNavigate: (callback: (view: string) => void) => {
+    ipcRenderer.on("nav:go", (_, view) => callback(view));
+    // Return cleanup function
+    return () => ipcRenderer.removeAllListeners("nav:go");
+  },
 });
