@@ -1,11 +1,137 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft, Save, Loader2, AlertCircle, CheckCircle, RotateCcw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Save, Loader2, AlertCircle, CheckCircle, RotateCcw, Keyboard } from "lucide-react";
 import { ezyvetConfigService } from "../services/ezyvetConfigService";
 import { DEFAULT_EZYVET_RECORDS } from "../types/ezyvetConfig";
 import type { EzyVetClinicalRecord } from "../types/ezyvetConfig";
 
 interface EzyVetSettingsProps {
     onBack: () => void;
+}
+
+// ── Shortcut recorder subcomponent ──────────────────────────────────────────
+function ShortcutPicker({ current, onSave }: { current: string; onSave: (key: string) => Promise<void> }) {
+    const [recording, setRecording] = useState(false);
+    const [pending, setPending] = useState<string>("");
+    const [saving, setSaving] = useState(false);
+    const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Convert Electron accelerator string to human-readable label
+    const humanize = (acc: string) =>
+        acc
+            .replace("CommandOrControl", "⌘/Ctrl")
+            .replace("Command", "⌘")
+            .replace("Control", "Ctrl")
+            .replace("Shift", "⇧")
+            .replace("Alt", "⌥")
+            .replace(/\+/g, " + ");
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Ignore bare modifier keys
+        if (["Meta", "Control", "Shift", "Alt"].includes(e.key)) return;
+
+        const parts: string[] = [];
+        if (e.metaKey || e.ctrlKey) parts.push("CommandOrControl");
+        if (e.shiftKey) parts.push("Shift");
+        if (e.altKey) parts.push("Alt");
+
+        // Map key to Electron accelerator name
+        const keyMap: Record<string, string> = {
+            " ": "Space", "\\": "\\", "/": "/", ".": ".", ",": ",",
+            ";": ";", "'": "'", "`": "`", "-": "-", "=": "=",
+            "[": "[", "]": "]",
+        };
+        const key = keyMap[e.key] ?? e.key.toUpperCase();
+        parts.push(key);
+
+        // Need at least one modifier + one key
+        if (parts.length < 2) return;
+
+        setPending(parts.join("+"));
+    };
+
+    const handleSave = async () => {
+        if (!pending) return;
+        setSaving(true);
+        setMsg(null);
+        try {
+            await onSave(pending);
+            setMsg({ text: `Saved! Use ${humanize(pending)} to show/hide.`, ok: true });
+            setPending("");
+            setRecording(false);
+        } catch {
+            setMsg({ text: "Failed to register shortcut — it may be used by another app.", ok: false });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="card mb-4">
+            <div className="card-header">
+                <div className="flex items-center gap-2">
+                    <Keyboard className="w-4 h-4" style={{ color: "var(--color-primary)" }} />
+                    <span className="card-title">Show / Hide Shortcut</span>
+                </div>
+            </div>
+            <div className="card-content flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: "var(--color-muted-foreground)" }}>Current:</span>
+                    <kbd className="px-2 py-0.5 rounded text-xs font-mono"
+                        style={{ background: "var(--color-muted)", border: "1px solid var(--color-border)" }}>
+                        {humanize(current)}
+                    </kbd>
+                </div>
+
+                {!recording ? (
+                    <button
+                        className="btn btn-outline btn-sm gap-2"
+                        onClick={() => { setRecording(true); setPending(""); setMsg(null); setTimeout(() => inputRef.current?.focus(), 50); }}
+                    >
+                        <Keyboard className="w-3.5 h-3.5" /> Change shortcut
+                    </button>
+                ) : (
+                    <div className="flex flex-col gap-2">
+                        <input
+                            ref={inputRef}
+                            readOnly
+                            onKeyDown={handleKeyDown}
+                            placeholder="Press new shortcut keys…"
+                            value={pending ? humanize(pending) : ""}
+                            className="input text-sm text-center"
+                            style={{ caretColor: "transparent" }}
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                className="btn btn-primary btn-sm flex-1"
+                                disabled={!pending || saving}
+                                onClick={handleSave}
+                            >
+                                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+                            </button>
+                            <button
+                                className="btn btn-outline btn-sm flex-1"
+                                onClick={() => { setRecording(false); setPending(""); }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {msg && (
+                    <p className={`text-xs ${msg.ok ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
+                )}
+                <p className="text-[10px]" style={{ color: "var(--color-muted-foreground)" }}>
+                    Use at least one modifier key (⌘/Ctrl, ⇧, ⌥) + a letter or number.
+                    Avoid keys already used by macOS (e.g. ⌘+Space, ⌘⇧+Space).
+                </p>
+            </div>
+        </div>
+    );
 }
 
 export function EzyVetSettings({ onBack }: EzyVetSettingsProps) {
@@ -15,10 +141,25 @@ export function EzyVetSettings({ onBack }: EzyVetSettingsProps) {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
+    const [currentShortcut, setCurrentShortcut] = useState("CommandOrControl+Shift+V");
 
     useEffect(() => {
         loadConfig();
+        loadShortcut();
     }, []);
+
+    const loadShortcut = async () => {
+        const el = window as any;
+        const result = await el.electron?.getShortcuts?.();
+        if (result?.showShortcut) setCurrentShortcut(result.showShortcut);
+    };
+
+    const handleSaveShortcut = async (key: string) => {
+        const el = window as any;
+        const result = await el.electron?.setShowShortcut?.(key);
+        if (!result?.success) throw new Error("Registration failed");
+        setCurrentShortcut(result.shortcut);
+    };
 
     const loadConfig = async () => {
         setLoading(true);
@@ -110,6 +251,9 @@ export function EzyVetSettings({ onBack }: EzyVetSettingsProps) {
                     </p>
                 </div>
             </div>
+
+            {/* Keyboard Shortcut Config */}
+            <ShortcutPicker current={currentShortcut} onSave={handleSaveShortcut} />
 
             {/* Status Messages */}
             {error && (

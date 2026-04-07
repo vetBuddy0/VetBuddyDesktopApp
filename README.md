@@ -21,7 +21,7 @@ Copy `.env.example` → `.env` and set `VITE_API_BASE_URL`.
 
 | Shortcut | Action |
 |---|---|
-| `Cmd+Shift+Space` | Show / Hide overlay |
+| `Cmd+Shift+V` | Show / Hide overlay *(configurable — see Settings ⚙)* |
 | `Cmd+Shift+M` | Minimise / Restore overlay |
 | `Cmd+Shift+1` | Switch to **Active Consultations** tab |
 | `Cmd+Shift+2` | Switch to **Patients** tab |

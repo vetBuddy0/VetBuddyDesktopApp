@@ -1,24 +1,72 @@
 import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut } from "electron";
 import { join } from "path";
 import { exec } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
+import { writeFileSync, unlinkSync, readFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { is } from "@electron-toolkit/utils";
 
 let mainWindow: BrowserWindow | null = null;
 
+// ── Config (stored in userData so it survives app updates) ───────────────────
+const CONFIG_PATH = join(app.getPath("userData"), "vetbuddy-config.json");
+const DEFAULT_SHOW_SHORTCUT = "CommandOrControl+Shift+V"; // default: Cmd+Shift+V
+
+function readConfig(): { showShortcut: string } {
+  try {
+    if (existsSync(CONFIG_PATH)) {
+      return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+    }
+  } catch { /* ignore parse errors */ }
+  return { showShortcut: DEFAULT_SHOW_SHORTCUT };
+}
+
+function writeConfig(config: { showShortcut: string }) {
+  try {
+    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  } catch (e) {
+    console.error("Failed to write config:", e);
+  }
+}
+
+// ── Show/hide shortcut — re-registerable ─────────────────────────────────────
+let currentShowShortcut = DEFAULT_SHOW_SHORTCUT;
+
+function registerShowShortcut(key: string): boolean {
+  // Unregister old one first
+  if (currentShowShortcut) {
+    try { globalShortcut.unregister(currentShowShortcut); } catch { /* ignore */ }
+  }
+  const ok = globalShortcut.register(key, () => {
+    if (!mainWindow) return;
+    if (mainWindow.isVisible() && mainWindow.isFocused()) {
+      mainWindow.hide();
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+  if (ok) {
+    currentShowShortcut = key;
+  } else {
+    // Restore old shortcut on failure
+    try { globalShortcut.register(currentShowShortcut, () => { /* noop fallback */ }); } catch { /* ignore */ }
+  }
+  return ok;
+}
+
+// ── Window factory ───────────────────────────────────────────────────────────
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 420,
     height: 680,
     minWidth: 360,
     minHeight: 500,
-    frame: false,             // Frameless for custom title bar
-    transparent: true,        // Transparent background
-    alwaysOnTop: true,        // Always over other apps
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
     resizable: true,
     skipTaskbar: false,
-    vibrancy: "under-window", // macOS frosted glass
+    vibrancy: "under-window",
     visualEffectState: "active",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -28,15 +76,11 @@ function createWindow(): void {
     },
   });
 
-  // Keep on top of all windows including system dialogs
   mainWindow.setAlwaysOnTop(true, "floating");
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-  mainWindow.on("ready-to-show", () => {
-    mainWindow?.show();
-  });
+  mainWindow.on("ready-to-show", () => mainWindow?.show());
 
-  // Open external links in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
@@ -49,20 +93,30 @@ function createWindow(): void {
   }
 }
 
-// ── Window controls ─────────────────────────────────────────────────────────
+// ── Window control IPC ───────────────────────────────────────────────────────
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
 ipcMain.on("window:close", () => mainWindow?.close());
-
 ipcMain.on("window:toggle-pin", (_, pinned: boolean) => {
   mainWindow?.setAlwaysOnTop(pinned, "floating");
 });
-
 ipcMain.on("window:set-opacity", (_, value: number) => {
   mainWindow?.setOpacity(value);
 });
 
+// ── Shortcut config IPC ──────────────────────────────────────────────────────
+ipcMain.handle("shortcuts:get", () => {
+  return { showShortcut: currentShowShortcut };
+});
+
+ipcMain.handle("shortcuts:set-show", (_, key: string) => {
+  const ok = registerShowShortcut(key);
+  if (ok) {
+    writeConfig({ showShortcut: key });
+  }
+  return { success: ok, shortcut: currentShowShortcut };
+});
+
 // ── Screen capture ───────────────────────────────────────────────────────────
-// Returns base64 data URL of the primary screen at 1920×1080 (or native res)
 ipcMain.handle("screen:capture", async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -70,7 +124,6 @@ ipcMain.handle("screen:capture", async () => {
       thumbnailSize: { width: 2560, height: 1440 },
     });
     if (!sources.length) return null;
-    // Use first (primary) screen
     return sources[0].thumbnail.toDataURL();
   } catch (err) {
     console.error("screen:capture failed:", err);
@@ -78,14 +131,11 @@ ipcMain.handle("screen:capture", async () => {
   }
 });
 
-// ── Smart paste at screen coordinate (macOS via AppleScript) ─────────────────
-// text is already in clipboard when this is called; just clicks + Cmd+V
+// ── Smart paste via AppleScript (macOS) ──────────────────────────────────────
 ipcMain.handle("screen:paste-at", async (_, { x, y }: { x: number; y: number }) => {
   if (process.platform !== "darwin") {
-    // Windows/Linux: use xdotool or similar — stub for now
     return { success: false, error: "Auto-paste only supported on macOS currently." };
   }
-
   const script = [
     `tell application "System Events"`,
     `  click at {${Math.round(x)}, ${Math.round(y)}}`,
@@ -95,11 +145,10 @@ ipcMain.handle("screen:paste-at", async (_, { x, y }: { x: number; y: number }) 
     `  key stroke "v" using command down`,
     `end tell`,
   ].join("\n");
-
   return new Promise((resolve) => {
     exec(`osascript << 'APPLESCRIPT'\n${script}\nAPPLESCRIPT`, (err) => {
       if (err) {
-        console.error("screen:paste-at AppleScript error:", err.message);
+        console.error("screen:paste-at error:", err.message);
         resolve({ success: false, error: err.message });
       } else {
         resolve({ success: true });
@@ -108,7 +157,7 @@ ipcMain.handle("screen:paste-at", async (_, { x, y }: { x: number; y: number }) 
   });
 });
 
-// ── Copy text to clipboard via pbcopy (macOS) ────────────────────────────────
+// ── Clipboard write via pbcopy ───────────────────────────────────────────────
 ipcMain.handle("clipboard:write", async (_, text: string) => {
   if (process.platform !== "darwin") return { success: false };
   const tmp = join(tmpdir(), `vb_${Date.now()}.txt`);
@@ -126,7 +175,7 @@ ipcMain.handle("clipboard:write", async (_, text: string) => {
   }
 });
 
-// ── IPC: navigate to a tab from renderer shortcut ───────────────────────────
+// ── Nav relay (global shortcut → renderer) ───────────────────────────────────
 ipcMain.on("nav:go", (_, view: string) => {
   mainWindow?.webContents.send("nav:go", view);
 });
@@ -135,29 +184,23 @@ ipcMain.on("nav:go", (_, view: string) => {
 app.whenReady().then(() => {
   createWindow();
 
-  // ── Global shortcuts (work even when app is not focused) ──────────────────
-  // Show / hide overlay
-  globalShortcut.register("CommandOrControl+Shift+Space", () => {
-    if (!mainWindow) return;
-    if (mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
+  // Load persisted shortcut
+  const config = readConfig();
+  const ok = registerShowShortcut(config.showShortcut);
+  if (!ok) {
+    // Fallback if saved shortcut is now taken by another app
+    registerShowShortcut(DEFAULT_SHOW_SHORTCUT);
+    writeConfig({ showShortcut: DEFAULT_SHOW_SHORTCUT });
+  }
 
   // Minimise / restore
   globalShortcut.register("CommandOrControl+Shift+M", () => {
     if (!mainWindow) return;
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    } else {
-      mainWindow.minimize();
-    }
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    else mainWindow.minimize();
   });
 
-  // Global tab switchers (Cmd+Shift+1..5)
+  // Tab switchers Cmd+Shift+1..5
   const tabKeys: [string, string][] = [
     ["CommandOrControl+Shift+1", "consultations"],
     ["CommandOrControl+Shift+2", "patients"],
@@ -168,10 +211,7 @@ app.whenReady().then(() => {
   for (const [key, view] of tabKeys) {
     globalShortcut.register(key, () => {
       if (!mainWindow) return;
-      if (!mainWindow.isVisible()) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+      if (!mainWindow.isVisible()) { mainWindow.show(); mainWindow.focus(); }
       mainWindow.webContents.send("nav:go", view);
     });
   }

@@ -22,7 +22,12 @@ contextBridge.exposeInMainWorld("electron", {
   // Listen for navigation events from main process (global shortcuts)
   onNavigate: (callback: (view: string) => void) => {
     ipcRenderer.on("nav:go", (_, view) => callback(view));
-    // Return cleanup function
     return () => ipcRenderer.removeAllListeners("nav:go");
   },
+
+  // Shortcut configuration
+  getShortcuts: (): Promise<{ showShortcut: string }> =>
+    ipcRenderer.invoke("shortcuts:get"),
+  setShowShortcut: (key: string): Promise<{ success: boolean; shortcut: string }> =>
+    ipcRenderer.invoke("shortcuts:set-show", key),
 });
