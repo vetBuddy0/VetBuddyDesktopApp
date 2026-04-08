@@ -137,163 +137,96 @@ export const ActiveConsultations: React.FC<ActiveConsultationsProps> = ({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filteredConsultations.map((consultation) => (
-            <div
-              key={consultation.id}
-              className="card card-hover"
-              style={{ 
-                animation: 'fadeSlideIn 0.2s ease-out',
-                borderLeft: '4px solid var(--color-primary)',
-                padding: '16px'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-                {/* Left side: Patient & Owner info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <h3 style={{ 
-                      fontSize: 16, 
-                      fontWeight: 700, 
-                      letterSpacing: '-0.4px', 
-                      margin: 0,
-                      color: 'var(--color-foreground)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {consultation.consultationType === 'quick_start'
-                        ? `${consultation.species || 'Unknown'} (Quick Start)`
-                        : consultation.patient?.name || 'Unknown Patient'}
-                    </h3>
-                    {consultation.consultationType === 'quick_start' && !consultation.patient && (
-                       <span className="badge badge-warning" style={{ fontSize: 10 }}>UNLINKED</span>
-                    )}
-                    <span className="badge badge-secondary" style={{ fontSize: 10, opacity: 0.8 }}>
-                      ID: #{consultation.id}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <span className="badge badge-primary" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      {consultation.patient?.species || consultation.species || 'Unknown'}
-                    </span>
-                    {consultation.patient?.breed && (
-                      <span style={{ fontSize: 12, color: 'var(--color-muted-foreground)', fontWeight: 500 }}>
-                        • {consultation.patient.breed}
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-                    {consultation.patient && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-foreground)', fontSize: 13 }}>
-                        <div style={{ 
-                          width: 28, height: 28, borderRadius: '50%', background: 'var(--color-muted)', 
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                        }}>
-                          <User size={14} style={{ color: 'var(--color-muted-foreground)' }} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontWeight: 600, fontSize: 12 }}>{consultation.patient.owner.name}</span>
-                          <span style={{ fontSize: 11, color: 'var(--color-muted-foreground)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <Phone size={10} /> {consultation.patient.owner.phone}
-                          </span>
+            <div key={consultation.id} className="card card-hover" style={{ animation: 'fadeSlideIn 0.2s ease-out' }}>
+              <div className="card-content">
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  {/* Main Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <div>
+                        <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--color-foreground)', marginBottom: 3 }}>
+                          {consultation.consultationType === 'quick_start'
+                            ? `${consultation.species || 'Unknown'} (Quick Start)`
+                            : consultation.patient?.name || 'Unknown Patient'}
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span className="badge badge-primary">{consultation.patient?.species || consultation.species || 'Unknown'}</span>
+                          {consultation.patient?.breed && (
+                            <span style={{ fontSize: 11, color: 'var(--color-muted-foreground)' }}>
+                              • {consultation.patient.breed}
+                            </span>
+                          )}
+                          {consultation.consultationType === 'quick_start' && !consultation.patient && (
+                            <span className="badge badge-warning" style={{ fontSize: 10 }}>UNLINKED</span>
+                          )}
+                          {/* <span className="badge badge-secondary" style={{ fontSize: 10, opacity: 0.8 }}>
+                            ID: #{consultation.id}
+                          </span> */}
                         </div>
                       </div>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-muted-foreground)', fontSize: 12 }}>
-                      <div style={{ 
-                        width: 28, height: 28, borderRadius: '50%', background: 'var(--color-muted)', 
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                      }}>
-                        <RefreshCw size={14} />
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 500, fontSize: 11 }}>STARTED AT</span>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-foreground)' }}>
-                          {consultation.startedAt ? new Date(consultation.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right side: Actions & Status */}
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'flex-end', 
-                  justifyContent: 'space-between',
-                  minWidth: '140px',
-                  borderLeft: '1px solid var(--color-border)',
-                  paddingLeft: 16
-                }}>
-                  <div style={{ textAlign: 'right', marginBottom: 12 }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'flex-end',
-                      gap: 6, 
-                      color: consultation.hasSOAP ? 'var(--color-primary)' : 'var(--color-success)', 
-                      fontWeight: 700, 
-                      fontSize: 11,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      <div style={{ 
-                        width: 6, 
-                        height: 6, 
-                        borderRadius: '50%', 
-                        background: consultation.hasSOAP ? 'var(--color-primary)' : 'var(--color-success)',
-                        boxShadow: consultation.hasSOAP ? '0 0 8px var(--color-primary)' : 'none'
-                      }} />
-                      {consultation.hasSOAP ? 'Note Ready' : 'In Progress'}
-                    </div>
-                    {consultation.startedAt && (
-                      <span style={{ fontSize: 11, color: 'var(--color-muted-foreground)' }}>
-                        {Math.floor((Date.now() - new Date(consultation.startedAt).getTime()) / (1000 * 60 * 60)) > 24 
-                          ? new Date(consultation.startedAt).toLocaleDateString()
-                          : `${Math.floor((Date.now() - new Date(consultation.startedAt).getTime()) / 60000)} mins ago`}
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button 
-                      onClick={() => onResumeConsultation?.(consultation.id)} 
-                      disabled={loading}
-                      className="btn btn-primary"
-                      style={{ padding: '8px 12px', height: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}
-                      title="Continue recording or editing"
-                    >
-                      <Play size={14} fill="currentColor" />
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>RESUME</span>
-                    </button>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button 
-                          onClick={() => onGenerateSOAP?.(consultation.id)} 
-                          disabled={loading}
-                          className="btn-icon primary sm" 
-                          title="Generate SOAP Note"
-                        >
+                      
+                      {/* Action icon row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                        <button onClick={() => onGenerateSOAP?.(consultation.id)} disabled={loading} className="btn-icon primary" title="Generate SOAP Note">
                           <FileText size={13} />
                         </button>
-                        <button 
-                          onClick={() => handleCompleteConsultation(consultation.id)} 
-                          disabled={loading}
-                          className="btn-icon success sm" 
-                          title="Mark as Complete"
-                        >
+                        <button onClick={() => handleCompleteConsultation(consultation.id)} disabled={loading} className="btn-icon success" title="Mark as Complete">
                           <Check size={13} />
                         </button>
-                        <button 
-                          onClick={() => handleDeleteConsultation(consultation.id)} 
-                          disabled={loading}
-                          className="btn-icon danger sm" 
-                          title="Delete Consultation"
-                        >
+                        <button onClick={() => handleDeleteConsultation(consultation.id)} disabled={loading} className="btn-icon danger" title="Delete">
                           <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Owner info & Actions */}
+                    <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {consultation.patient ? (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--color-foreground)', fontWeight: 500 }}>
+                              <User size={11} style={{ color: 'var(--color-muted-foreground)' }} />
+                              {consultation.patient.owner.name === 'Owner' ? 'Unknown User' : consultation.patient.owner.name}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--color-muted-foreground)' }}>
+                              <Phone size={11} />
+                              {consultation.patient.owner.phone === '9999999999' ? 'No phone' : consultation.patient.owner.phone}
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: 11, color: 'var(--color-muted-foreground)' }}>No owner linked</div>
+                        )}
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                           <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 6, 
+                            color: consultation.hasSOAP ? 'var(--color-primary)' : 'var(--color-success)', 
+                            fontWeight: 700, 
+                            fontSize: 10,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {/* <div style={{ 
+                              width: 6, height: 6, borderRadius: '50%', 
+                              background: consultation.hasSOAP ? 'var(--color-primary)' : 'var(--color-success)',
+                              boxShadow: consultation.hasSOAP ? '0 0 8px var(--color-primary)' : 'none'
+                            }} />
+                            {consultation.hasSOAP ? 'Note Ready' : 'In Prog.'} */}
+                          </div>
+                          {consultation.startedAt && (
+                            <span style={{ fontSize: 10, color: 'var(--color-muted-foreground)' }}>
+                              {Math.floor((Date.now() - new Date(consultation.startedAt).getTime()) / (1000 * 60 * 60)) > 24 
+                                ? new Date(consultation.startedAt).toLocaleDateString()
+                                : `${Math.floor((Date.now() - new Date(consultation.startedAt).getTime()) / 60000)}m ago`}
+                            </span>
+                          )}
+                        </div>
+                        <button onClick={() => onResumeConsultation?.(consultation.id)} disabled={loading} className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Play size={11} fill="currentColor" /> Resume
                         </button>
                       </div>
                     </div>

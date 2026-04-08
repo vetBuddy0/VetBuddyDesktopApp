@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, X, Minimize2, Maximize2 } from 'lucide-react';
+import { Send, Bot, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getAuthHeaders, getUserData } from '../authUtils';
 
