@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { login, signup } from '../authService'
-  import {Stethoscope} from 'lucide-react'
-// import vetbuddyLogo from '../assets/vetbuddy_icon.png'
+import { Stethoscope, Mail, Lock, User as UserIcon } from 'lucide-react'
 
 interface AuthPanelProps {
   onLoginSuccess?: () => void
@@ -19,15 +18,8 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false)
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      setError('Please enter email and password')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
+    if (!email || !password) { setError('Please enter email and password'); return }
+    setLoading(true); setError(''); setSuccess('')
     try {
       await login(email, password)
       onLoginSuccess?.()
@@ -39,25 +31,13 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ onLoginSuccess }) => {
   }
 
   const handleSignUp = async () => {
-    if (!email || !password || !fullName) {
-      setError('Please fill in all fields')
-      return
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
+    if (!email || !password || !fullName) { setError('Please fill in all fields'); return }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return }
+    setLoading(true); setError(''); setSuccess('')
     try {
       await signup(fullName, email, password)
       onLoginSuccess?.()
     } catch (err: any) {
-      // Handle specific Firebase errors
       if (err.code === 'auth/email-already-in-use') {
         setError('This email is already registered. Please sign in instead.')
       } else if (err.code === 'auth/invalid-email') {
@@ -72,229 +52,134 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ onLoginSuccess }) => {
     }
   }
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Please enter your email address')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      await forgotPassword(email)
-      setSuccess('Password reset email sent! Check your inbox.')
-      setTimeout(() => setMode('signin'), 3000)
-    } catch (err: any) {
-      setError(err.message || 'Failed to send reset email')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // const handleGoogleSignIn = async () => {
-  //   setLoading(true)
-  //   setError('')
-  //   setSuccess('')
-
-  //   try {
-  //     await signInWithGoogle()
-  //     onLoginSuccess?.()
-  //   } catch (err: any) {
-  //     // More user-friendly error message for popup blocking
-  //     if (err.message?.includes('popup') || err.message?.includes('blocked')) {
-  //       setError('Google Sign-In is currently unavailable in extensions. Please use email/password to sign in.')
-  //     } else {
-  //       setError(err.message || 'Google sign-in failed. Please use email/password instead.')
-  //     }
-  //   } finally {
-  //     setLoading(false)
-  //   }
-  // }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (mode === 'signin') handleSignIn()
     else if (mode === 'signup') handleSignUp()
-    else if (mode === 'forgot') handleForgotPassword()
   }
 
   return (
-    <div>
-      <div className="text-center mb-6">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl from-primary to-primary-dark flex items-center justify-center text-white font-bold text-3xl">
-          <Stethoscope className="w-5 h-5" />
+    <div style={{ padding: '0 20px 20px', maxWidth: 340, margin: '0 auto', width: '100%' }}>
+      {/* Hero / Logo */}
+      <div style={{ textAlign: 'center', marginBottom: 24, paddingTop: 8 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 18, margin: '0 auto 14px',
+          background: 'var(--color-primary)',
+          boxShadow: '0 0 0 5px var(--color-purple-100), var(--shadow-primary-sm)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Stethoscope size={28} style={{ color: 'white' }} />
         </div>
-        <h2 className="text-2xl font-semibold text-foreground mb-2">
-          VetBuddy
+        <h2 style={{
+          fontSize: 20, fontWeight: 800, letterSpacing: '-0.5px',
+          color: 'var(--color-primary)',
+          marginBottom: 4,
+        }}>
+          My VetBuddy
         </h2>
-        <p className="text-muted text-sm">
+        <p style={{ fontSize: 12.5, color: 'var(--color-muted-foreground)', fontWeight: 500 }}>
           {mode === 'signin' && 'Sign in to your account'}
-          {mode === 'signup' && 'Create a new account'}
+          {mode === 'signup' && 'Create your account'}
           {mode === 'forgot' && 'Reset your password'}
         </p>
       </div>
 
-      {error && (
-        <div className="alert alert-error">
-          {error}
+      {/* Card */}
+      <div style={{
+        background: 'var(--color-card)',
+        borderRadius: 16,
+        border: '1px solid var(--color-border)',
+        boxShadow: 'var(--shadow-lg)',
+        padding: '20px 18px',
+        animation: 'scaleIn 0.2s ease-out',
+      }}>
+        {/* Mode toggle pill */}
+        <div style={{
+          display: 'flex', background: 'var(--color-muted)', borderRadius: 10,
+          padding: 3, marginBottom: 18, gap: 2,
+        }}>
+          {(['signin', 'signup'] as AuthMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setError(''); setSuccess('') }}
+              style={{
+                flex: 1, padding: '5px 0', fontSize: 12, fontWeight: mode === m ? 600 : 500,
+                borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: mode === m ? 'var(--color-card)' : 'transparent',
+                color: mode === m ? 'var(--color-primary)' : 'var(--color-muted-foreground)',
+                boxShadow: mode === m ? 'var(--shadow-xs)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
+              {m === 'signin' ? 'Sign In' : 'Sign Up'}
+            </button>
+          ))}
         </div>
-      )}
 
-      {success && (
-        <div className="alert alert-success">
-          {success}
-        </div>
-      )}
+        {error && <div className="alert alert-error">{error}</div>}
+        {success && <div className="alert alert-success">{success}</div>}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {mode === 'signup' && (
-          <div>
-            <label className="text-sm text-muted block mb-2">
-              Full Name
-            </label>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {mode === 'signup' && (
+            <div className="input-icon-wrapper">
+              <UserIcon size={14} className="input-icon" />
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Full name (e.g. Dr. Jane Smith)"
+                disabled={loading}
+                className="input"
+              />
+            </div>
+          )}
+
+          <div className="input-icon-wrapper">
+            <Mail size={14} className="input-icon" />
             <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Dr. John Doe"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email address"
               disabled={loading}
               className="input"
             />
           </div>
-        )}
 
-        <div>
-          <label className="text-sm text-muted block mb-2">
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            disabled={loading}
-            className="input"
-          />
-        </div>
-
-        {mode !== 'forgot' && (
-          <div>
-            <label className="text-sm text-muted block mb-2">
-              Password
-            </label>
+          <div className="input-icon-wrapper">
+            <Lock size={14} className="input-icon" />
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Password"
               disabled={loading}
               className="input"
             />
           </div>
-        )}
 
-        {/* {mode === 'signin' && (
-          <div className="text-right -mt-2">
-            <button
-              type="button"
-              onClick={() => setMode('forgot')}
-              disabled={loading}
-              className="text-muted bg-transparent border-none cursor-pointer p-0 underline font-medium text-sm hover:text-foreground transition-colors"
-            >
-              Forgot password?
-            </button>
-          </div>
-        )} */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary btn-lg"
+            style={{ width: '100%', marginTop: 4 }}
+          >
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="spinner" style={{ borderTopColor: 'white', borderColor: 'rgba(255,255,255,0.3)' }} />
+                Please wait...
+              </span>
+            ) : (
+              mode === 'signin' ? 'Sign In' : 'Create Account'
+            )}
+          </button>
+        </form>
+      </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn btn-primary btn-lg w-full mt-2"
-        >
-          {loading ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="spinner"></div>
-              Please wait...
-            </div>
-          ) : (
-            mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Reset Email'
-          )}
-        </button>
-
-        {/* Google Sign-In using Chrome Identity API */}
-        {/* {mode !== 'forgot' && (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0' }}>
-              <div style={{ height: 1, background: '#e0e0e0', flex: 1 }} />
-              <div style={{ color: '#5f6368', fontSize: 12 }}>or</div>
-              <div style={{ height: 1, background: '#e0e0e0', flex: 1 }} />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '8px 12px',
-                border: '1px solid #dadce0',
-                borderRadius: 6,
-                background: '#fff',
-                fontSize: 14,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1
-              }}
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width={18} height={18} alt="Google" />
-              Continue with Google
-            </button>
-          </>
-        )} */}
-
-        {/* <div className="text-sm text-muted mt-4 text-center">
-          {mode === 'signin' && (
-            <>
-              Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('signup')
-                  setError('')
-                  setSuccess('')
-                }}
-                disabled={loading}
-                className="text-primary bg-transparent border-none cursor-pointer p-0 underline font-medium hover:text-primary-dark transition-colors"
-              >
-                Sign up
-              </button>
-            </>
-          )}
-          {(mode === 'signup' || mode === 'forgot') && (
-            <>
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('signin')
-                  setError('')
-                  setSuccess('')
-                }}
-                disabled={loading}
-                className="text-primary bg-transparent border-none cursor-pointer p-0 underline font-medium hover:text-primary-dark transition-colors"
-              >
-                Sign in
-              </button>
-            </>
-          )}
-        </div> */}
-      </form>
+      {/* Footer note */}
+      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--color-muted-foreground)', marginTop: 14 }}>
+        AI-powered veterinary consultation assistant
+      </p>
     </div>
   )
 }
-
-

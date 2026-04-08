@@ -10,7 +10,7 @@ import { EzyVetSettings } from "./components/EzyVetSettings";
 import { PasteLab } from "./components/PasteLab";
 import { logout } from "./authService";
 import { getUIState, setUIState, clearUIState } from "./stateStorage";
-import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings, Zap } from "lucide-react";
+import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings, Zap, LogOut, Pin, Minus, X } from "lucide-react";
 import type { EzyVetPrefillData } from "./types/patient";
 
 type View =
@@ -25,15 +25,12 @@ type View =
   | "ezyvet-settings";
 
 export default function App() {
-  // Window controls
   const [pinned, setPinned] = useState(true);
   const [opacity, setOpacity] = useState(1);
 
-  // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // UI state
   const [isStateLoaded, setIsStateLoaded] = useState(false);
   const [currentView, setCurrentView] = useState<View>("patients");
   const [activeConsultationId, setActiveConsultationId] = useState<number | null>(null);
@@ -41,7 +38,6 @@ export default function App() {
   const [selectedPatientName, setSelectedPatientName] = useState<string>("");
   const [ezyvetPrefill] = useState<EzyVetPrefillData | null>(null);
 
-  // ── Window controls ─────────────────────────────────────────────────────────
   const togglePin = () => {
     const next = !pinned;
     setPinned(next);
@@ -52,7 +48,6 @@ export default function App() {
     (window as any).electron?.setOpacity(opacity);
   }, [opacity]);
 
-  // ── Global shortcut nav from main process ───────────────────────────────────
   useEffect(() => {
     const el = window as any;
     const cleanup = el.electron?.onNavigate?.((view: string) => {
@@ -61,7 +56,6 @@ export default function App() {
     return () => cleanup?.();
   }, [isLoggedIn]);
 
-  // ── Local keyboard shortcuts (app focused) ───────────────────────────────────
   useEffect(() => {
     if (!isLoggedIn) return;
     const handler = (e: KeyboardEvent) => {
@@ -72,13 +66,12 @@ export default function App() {
         "2": "patients",
         "3": "notes",
         "4": "templates",
-        "5": "paste-lab",
+        // "5": "paste-lab",
       };
       if (map[e.key]) {
         e.preventDefault();
         setCurrentView(map[e.key]);
       }
-      // Cmd+W → close, Cmd+M → minimise (local, without Shift)
       if (e.key === "w") { e.preventDefault(); (window as any).electron?.close(); }
       if (e.key === "m") { e.preventDefault(); (window as any).electron?.minimize(); }
     };
@@ -86,7 +79,6 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [isLoggedIn]);
 
-  // ── Auth check ──────────────────────────────────────────────────────────────
   const checkAuthState = useCallback(() => {
     const token = localStorage.getItem("vetbuddy_token");
     const user = localStorage.getItem("vetbuddy_user");
@@ -94,11 +86,8 @@ export default function App() {
     setIsCheckingAuth(false);
   }, []);
 
-  useEffect(() => {
-    checkAuthState();
-  }, [checkAuthState]);
+  useEffect(() => { checkAuthState(); }, [checkAuthState]);
 
-  // ── UI state persistence ────────────────────────────────────────────────────
   useEffect(() => {
     const loadPersistedState = async () => {
       try {
@@ -137,22 +126,70 @@ export default function App() {
 
   const isMainView = ["patients", "consultations", "notes", "templates", "paste-lab"].includes(currentView);
 
+  const TitleBar = ({ minimal = false }: { minimal?: boolean }) => (
+    <div className="titlebar">
+      <div className="titlebar-left">
+        <div className="titlebar-logo">
+          <Stethoscope size={14} style={{ color: "white" }} />
+        </div>
+        <span className="titlebar-wordmark">My VetBuddy</span>
+      </div>
+
+      <div className="titlebar-controls">
+        <div className="opacity-row">
+          <input
+            type="range" min="0.3" max="1" step="0.05"
+            value={opacity}
+            onChange={(e) => setOpacity(Number(e.target.value))}
+            title="Window opacity"
+          />
+        </div>
+
+        {!minimal && (
+          <button
+            onClick={() => setCurrentView("ezyvet-settings")}
+            className="ctrl-btn"
+            title="ezyVet Settings"
+          >
+            <Settings size={13} />
+          </button>
+        )}
+
+        {!minimal && (
+          <button
+            onClick={handleLogout}
+            className="ctrl-btn"
+            title="Logout"
+          >
+            <LogOut size={12} />
+          </button>
+        )}
+
+        <button
+          className={`ctrl-btn ${pinned ? "active" : ""}`}
+          title={pinned ? "Unpin window" : "Pin on top"}
+          onClick={togglePin}
+        >
+          <Pin size={12} />
+        </button>
+        <button className="ctrl-btn" title="Minimize" onClick={() => (window as any).electron?.minimize()}>
+          <Minus size={13} />
+        </button>
+        <button className="ctrl-btn close" title="Close" onClick={() => (window as any).electron?.close()}>
+          <X size={13} />
+        </button>
+      </div>
+    </div>
+  );
+
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (isCheckingAuth) {
     return (
       <div id="root">
-        <div className="titlebar">
-          <div className="titlebar-left">
-            <Stethoscope size={16} style={{ color: "var(--color-primary)" }} />
-            <span>VetBuddy</span>
-          </div>
-          <div className="titlebar-controls">
-            <button className="ctrl-btn close" onClick={() => (window as any).electron?.close()}>✕</button>
-          </div>
-        </div>
-        <div className="content flex flex-col items-center justify-center gap-3">
-          <div className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }}></div>
-          <p className="text-muted text-sm">Loading...</p>
+        <TitleBar minimal />
+        <div className="content" style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, background: "var(--color-background)" }}>
+          <div className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+          <p style={{ fontSize: 12, color: "var(--color-muted-foreground)", fontWeight: 500 }}>Loading My VetBuddy...</p>
         </div>
       </div>
     );
@@ -162,35 +199,9 @@ export default function App() {
   if (!isLoggedIn) {
     return (
       <div id="root">
-        {/* Title bar */}
-        <div className="titlebar">
-          <div className="titlebar-left">
-            <Stethoscope size={16} style={{ color: "var(--color-primary)" }} />
-            <span>VetBuddy</span>
-          </div>
-          <div className="titlebar-controls">
-            <div className="opacity-row">
-              <label>Opacity</label>
-              <input
-                type="range" min="0.3" max="1" step="0.05"
-                value={opacity}
-                onChange={(e) => setOpacity(Number(e.target.value))}
-              />
-            </div>
-            <button className={`ctrl-btn ${pinned ? "active" : ""}`} title="Pin on top" onClick={togglePin}>📌</button>
-            <button className="ctrl-btn" title="Minimize" onClick={() => (window as any).electron?.minimize()}>−</button>
-            <button className="ctrl-btn close" title="Close" onClick={() => (window as any).electron?.close()}>✕</button>
-          </div>
-        </div>
-
-        {/* Auth content */}
+        <TitleBar minimal />
         <div className="content" style={{ background: "var(--color-background)", overflow: "auto", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <AuthPanel
-            onLoginSuccess={() => {
-              setIsLoggedIn(true);
-              setCurrentView("patients");
-            }}
-          />
+          <AuthPanel onLoginSuccess={() => { setIsLoggedIn(true); setCurrentView("patients"); }} />
         </div>
       </div>
     );
@@ -199,92 +210,37 @@ export default function App() {
   // ── Main app ────────────────────────────────────────────────────────────────
   return (
     <div id="root">
-      {/* ── Title Bar ── */}
-      <div className="titlebar">
-        <div className="titlebar-left">
-          <div
-            style={{
-              width: 24, height: 24, borderRadius: 6,
-              background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            <Stethoscope size={13} style={{ color: "white" }} />
-          </div>
-          <span>VetBuddy</span>
-        </div>
-
-        <div className="titlebar-controls">
-          <div className="opacity-row">
-            <input
-              type="range" min="0.3" max="1" step="0.05"
-              value={opacity}
-              onChange={(e) => setOpacity(Number(e.target.value))}
-              title="Opacity"
-            />
-          </div>
-          <button
-            onClick={() => setCurrentView("ezyvet-settings")}
-            className="ctrl-btn"
-            title="ezyVet Settings"
-          >
-            <Settings size={13} />
-          </button>
-          <button onClick={handleLogout} className="ctrl-btn" title="Logout" style={{ fontSize: 11, fontWeight: 600 }}>
-            Out
-          </button>
-          <button className={`ctrl-btn ${pinned ? "active" : ""}`} title="Pin on top" onClick={togglePin}>📌</button>
-          <button className="ctrl-btn" title="Minimize" onClick={() => (window as any).electron?.minimize()}>−</button>
-          <button className="ctrl-btn close" title="Close" onClick={() => (window as any).electron?.close()}>✕</button>
-        </div>
-      </div>
+      <TitleBar />
 
       {/* ── Navigation Tabs ── */}
       {isMainView && (
         <div className="navbar">
           <div className="tabs">
-            <button
-              onClick={() => setCurrentView("consultations")}
-              className={`tab ${currentView === "consultations" ? "tab-active" : ""}`}
-            >
-              <Clock10 size={13} />
-              Active
-            </button>
-            <button
-              onClick={() => { setCurrentView("patients"); setSelectedPatientId(null); }}
-              className={`tab ${currentView === "patients" ? "tab-active" : ""}`}
-            >
-              <Users2 size={13} />
-              Patients
-            </button>
-            <button
-              onClick={() => setCurrentView("notes")}
-              className={`tab ${currentView === "notes" ? "tab-active" : ""}`}
-            >
-              <FileText size={13} />
-              Notes
-            </button>
-            <button
-              onClick={() => setCurrentView("templates")}
-              className={`tab ${currentView === "templates" ? "tab-active" : ""}`}
-            >
-              <FileEdit size={13} />
-              Templates
-            </button>
-            <button
-              onClick={() => setCurrentView("paste-lab")}
-              className={`tab ${currentView === "paste-lab" ? "tab-active" : ""}`}
-            >
-              <Zap size={13} />
-              Paste Lab
-            </button>
+            {[
+              { view: "consultations" as View, icon: <Clock10 size={13} />, label: "Active" },
+              { view: "patients" as View, icon: <Users2 size={13} />, label: "Patients" },
+              { view: "notes" as View, icon: <FileText size={13} />, label: "Notes" },
+              { view: "templates" as View, icon: <FileEdit size={13} />, label: "Templates" },
+              // { view: "paste-lab" as View, icon: <Zap size={13} />, label: "Paste Lab" },
+            ].map(({ view, icon, label }) => (
+              <button
+                key={view}
+                onClick={() => {
+                  if (view === "patients") setSelectedPatientId(null);
+                  setCurrentView(view);
+                }}
+                className={`tab ${currentView === view ? "tab-active" : ""}`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
       {/* ── Content Area ── */}
       <div className="content">
-        {/* Patients */}
         {currentView === "patients" && (
           <PatientList
             prefillData={ezyvetPrefill}
@@ -305,7 +261,6 @@ export default function App() {
           />
         )}
 
-        {/* Active Consultations */}
         {currentView === "consultations" && (
           <ActiveConsultations
             onResumeConsultation={(consultationId) => {
@@ -319,7 +274,6 @@ export default function App() {
           />
         )}
 
-        {/* Recording */}
         {(currentView === "home" || currentView === "recording") && (
           <RecordingWidget
             consultationId={activeConsultationId}
@@ -335,7 +289,6 @@ export default function App() {
           />
         )}
 
-        {/* SOAP Notes (past, per patient) */}
         {currentView === "soapnotes" && (
           <SOAPNoteList
             selectedPatientId={selectedPatientId !== null ? selectedPatientId : undefined}
@@ -348,21 +301,15 @@ export default function App() {
           />
         )}
 
-        {/* SOAP Note Generator */}
         {currentView === "notes" && (
           <SOAPNoteGenerator
             initialConsultationId={activeConsultationId}
-            autoGenerate={activeConsultationId !== null}
           />
         )}
 
-        {/* Templates */}
         {currentView === "templates" && <TemplateManager />}
-
-        {/* Paste Lab */}
         {currentView === "paste-lab" && <PasteLab />}
 
-        {/* ezyVet Settings */}
         {currentView === "ezyvet-settings" && (
           <EzyVetSettings onBack={() => setCurrentView("patients")} />
         )}

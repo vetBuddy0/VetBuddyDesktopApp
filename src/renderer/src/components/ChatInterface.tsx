@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, X, Minimize2, Maximize2, Loader2 } from 'lucide-react';
+import { Send, Bot, X, Minimize2, Maximize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { getAuthHeaders, getUserData } from '../authUtils';
 
@@ -137,10 +137,15 @@ export function ChatInterface({ consultationId, patientId, contextData }: ChatIn
             <button
                 onClick={() => setIsOpen(true)}
                 title="Open AI Assistant"
-                style={{ background: 'var(--color-primary)' }}
-                className="fixed bottom-4 right-4 z-50 w-11 h-11 rounded-full shadow-xl flex items-center justify-center text-white hover:opacity-90 transition-opacity"
+                className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full flex items-center justify-center text-white transition-all card-shadow hover:scale-110 active:scale-95"
+                style={{
+                    background: 'var(--color-primary)',
+                    boxShadow: 'var(--shadow-primary)',
+                    border: 'none',
+                    cursor: 'pointer'
+                }}
             >
-                <Bot className="w-5 h-5" />
+                <Bot size={22} />
             </button>
         );
     }
@@ -150,124 +155,208 @@ export function ChatInterface({ consultationId, patientId, contextData }: ChatIn
             {/* Chat panel — slides up from above the FAB */}
             {!isMinimized && (
                 <div
-                    className="fixed left-3 right-3 z-50 bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+                    className="fixed left-3 right-3 z-50 flex flex-col overflow-hidden card scale-in"
                     style={{
-                        bottom: '64px',
-                        height: '320px',
-                        border: '1px solid var(--color-border)',
+                        bottom: '72px',
+                        minHeight: 'calc(100vh - 200px)',
                     }}
                 >
-                    {/* Messages */}
+                    {/* Header */}
+                    <div style={{
+                        padding: '10px 14px',
+                        background: 'var(--color-card)',
+                        borderBottom: '1px solid var(--color-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                                width: 24, height: 24, borderRadius: 6,
+                                background: 'var(--color-primary)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                                <Bot size={14} color="white" />
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px' }}>My VetBuddy AI</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                            {/* <button onClick={() => setIsMinimized(true)} className="btn-icon sm">
+                                <Minimize2 size={13} />
+                            </button> */}
+                            <button onClick={() => setIsOpen(false)} className="btn-icon sm danger">
+                                <X size={13} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Messages container */}
                     <div
-                        className="flex-1 overflow-y-auto p-3 space-y-3"
+                        className="flex-1 overflow-y-auto p-4 space-y-4"
                         style={{ background: 'var(--color-muted)' }}
                     >
                         {messages.length === 0 && (
-                            <div className="text-center text-sm mt-6" style={{ color: 'var(--color-muted-foreground)' }}>
-                                <Bot className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                                <p className="font-medium">VetBuddy Assistant</p>
-                                <p className="text-xs mt-1 opacity-70">Ask anything about this consultation</p>
+                            <div className="empty-state" style={{ padding: '40px 20px' }}>
+                                <div className="empty-state-icon">
+                                    <Bot size={24} />
+                                </div>
+                                <h3 className="empty-state-title">My VetBuddy Assistant</h3>
+                                <p className="empty-state-desc">Ask anything about this consultation, transcription, or SOAP notes.</p>
                             </div>
                         )}
-                        {messages.map(msg => (
-                            <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div
-                                    className="max-w-[88%] rounded-xl px-3 py-2 text-sm"
-                                    style={msg.sender === 'user'
-                                        ? { background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }
-                                        : { background: 'var(--color-card)', border: '1px solid var(--color-border)', color: 'var(--color-foreground)' }
-                                    }
-                                >
-                                    {msg.sender === 'bot' ? (
-                                        <div className="markdown-content break-words overflow-hidden text-[12px]">
-                                            <ReactMarkdown
-                                                components={{
-                                                    p: ({ ...props }) => <p className="mb-1.5 last:mb-0" {...props} />,
-                                                    ul: ({ ...props }) => <ul className="list-disc ml-4 mb-1.5" {...props} />,
-                                                    ol: ({ ...props }) => <ol className="list-decimal ml-4 mb-1.5" {...props} />,
-                                                    li: ({ ...props }) => <li className="mb-0.5" {...props} />,
-                                                    strong: ({ ...props }) => <span className="font-bold" style={{ color: 'var(--color-primary)' }} {...props} />,
-                                                    code: ({ ...props }) => <code className="rounded px-1 py-0.5 text-xs font-mono" style={{ background: 'var(--color-muted)' }} {...props} />,
-                                                }}
-                                            >
-                                                {msg.text}
-                                            </ReactMarkdown>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            {messages.map(msg => (
+                                <div key={msg.id} style={{
+                                    display: 'flex',
+                                    justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                                    animation: 'fadeSlideIn 0.2s ease-out'
+                                }}>
+                                    <div
+                                        style={msg.sender === 'user'
+                                            ? {
+                                                background: 'var(--color-primary)',
+                                                color: 'var(--color-primary-foreground)',
+                                                padding: '10px 14px',
+                                                borderRadius: '16px 16px 2px 16px',
+                                                maxWidth: '85%',
+                                                boxShadow: 'var(--shadow-sm)'
+                                            }
+                                            : {
+                                                background: 'var(--color-card)',
+                                                border: '1px solid var(--color-border)',
+                                                color: 'var(--color-foreground)',
+                                                padding: '10px 14px',
+                                                borderRadius: '16px 16px 16px 2px',
+                                                maxWidth: '90%',
+                                                boxShadow: 'var(--shadow-sm)'
+                                            }
+                                        }
+                                    >
+                                        {msg.sender === 'bot' ? (
+                                            <div className="markdown-content text-[12.5px] leading-relaxed">
+                                                <ReactMarkdown
+                                                    components={{
+                                                        p: ({ ...props }) => <p style={{ marginBottom: 10 }} {...props} />,
+                                                        ul: ({ ...props }) => <ul style={{ marginLeft: 16, marginBottom: 10, listStyleType: 'disc' }} {...props} />,
+                                                        ol: ({ ...props }) => <ol style={{ marginLeft: 16, marginBottom: 10, listStyleType: 'decimal' }} {...props} />,
+                                                        li: ({ ...props }) => <li style={{ marginBottom: 4 }} {...props} />,
+                                                        strong: ({ ...props }) => <span style={{ fontWeight: 700, color: 'var(--color-primary)' }} {...props} />,
+                                                        code: ({ ...props }) => <code style={{
+                                                            background: 'var(--color-muted)',
+                                                            padding: '2px 4px',
+                                                            borderRadius: 4,
+                                                            fontSize: '11px',
+                                                            fontFamily: 'monospace'
+                                                        }} {...props} />,
+                                                    }}
+                                                >
+                                                    {msg.text}
+                                                </ReactMarkdown>
+                                            </div>
+                                        ) : (
+                                            <p style={{ fontSize: '12.5px', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{msg.text}</p>
+                                        )}
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'flex-end',
+                                            marginTop: 6,
+                                            opacity: 0.6,
+                                            fontSize: '10px',
+                                            fontWeight: 500
+                                        }}>
+                                            {formatTime(msg.timestamp)}
                                         </div>
-                                    ) : (
-                                        <p className="whitespace-pre-wrap text-[12px]">{msg.text}</p>
-                                    )}
-                                    <p className="text-[10px] mt-1 text-right opacity-50">
-                                        {formatTime(msg.timestamp)}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                        {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="rounded-xl px-3 py-2" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)' }}>
-                                    <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-muted-foreground)' }}>
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                        <span>Thinking...</span>
                                     </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {isTyping && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-start', animation: 'fadeSlideIn 0.2s ease-out' }}>
+                                <div style={{
+                                    background: 'var(--color-card)',
+                                    border: '1px solid var(--color-border)',
+                                    padding: '8px 12px',
+                                    borderRadius: '14px 14px 14px 2px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    boxShadow: 'var(--shadow-xs)'
+                                }}>
+                                    <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
+                                    <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--color-muted-foreground)' }}>My VetBuddy is thinking...</span>
                                 </div>
                             </div>
                         )}
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input */}
+                    {/* Input Area */}
                     <div
-                        className="p-2 flex-shrink-0"
-                        style={{ background: 'var(--color-card)', borderTop: '1px solid var(--color-border)' }}
+                        style={{
+                            padding: '12px 14px',
+                            background: 'var(--color-card)',
+                            borderTop: '1px solid var(--color-border)'
+                        }}
                     >
                         <form
                             onSubmit={e => { e.preventDefault(); handleSendMessage(); }}
-                            className="flex items-center gap-2"
+                            style={{ display: 'flex', gap: 8, alignItems: 'center' }}
                         >
                             <input
                                 type="text"
                                 value={inputMessage}
                                 onChange={e => setInputMessage(e.target.value)}
-                                placeholder="Ask about this consultation..."
-                                className="input flex-1"
-                                style={{ padding: '6px 10px', fontSize: '12px' }}
+                                placeholder="Ask about this patient or notes..."
+                                className="input"
+                                style={{ flex: 1, padding: '9px 12px', fontSize: '13px' }}
+                                disabled={isTyping}
                                 autoFocus
                             />
                             <button
                                 type="submit"
                                 disabled={!inputMessage.trim() || isTyping}
-                                className="btn btn-primary btn-sm flex-shrink-0"
-                                style={{ padding: '6px 10px' }}
+                                className="btn btn-primary btn-icon"
+                                style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }}
                             >
-                                <Send className="w-3.5 h-3.5" />
+                                <Send size={16} />
                             </button>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* Floating pill — always visible when chat is open */}
+            {/* Floating pill — visible when chat is minimized or just the button when closed */}
             <div
-                className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full px-3 h-11 shadow-xl cursor-pointer select-none"
-                style={{ background: 'var(--color-primary)', color: 'var(--color-primary-foreground)' }}
+                className="fixed bottom-4 right-4 z-50 flex items-center justify-center gap-3 rounded-full px-4 h-12 w-12 shadow-xl cursor-pointer select-none transition-all hover:scale-105 active:scale-95"
+                style={{
+                    background: 'var(--color-primary)',
+                    color: 'var(--color-primary-foreground)',
+                    display: isOpen ? 'flex' : 'none',
+                    boxShadow: 'var(--shadow-primary)'
+                }}
                 onClick={() => setIsMinimized(prev => !prev)}
             >
-                <Bot className="w-4 h-4 flex-shrink-0" />
-                <span className="text-sm font-medium">VetBuddy AI</span>
-                <button
-                    className="p-0.5 hover:bg-white/20 rounded-full ml-1"
-                    onClick={e => { e.stopPropagation(); setIsMinimized(prev => !prev); }}
-                    title={isMinimized ? 'Expand' : 'Minimise'}
-                >
-                    {isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                    className="p-0.5 hover:bg-white/20 rounded-full"
-                    onClick={e => { e.stopPropagation(); setIsOpen(false); }}
-                    title="Close"
-                >
-                    <X className="w-3.5 h-3.5" />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Bot size={20} />
+                    {/* <span style={{ fontSize: 13, fontWeight: 600 }}>My VetBuddy AI</span> */}
+                </div>
+
+                {/* <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: 10, marginLeft: 2 }}>
+                    <button
+                        style={{ background: 'transparent', border: 'none', color: 'white', padding: 4, cursor: 'pointer', display: 'flex' }}
+                        onClick={e => { e.stopPropagation(); setIsMinimized(prev => !prev); }}
+                    >
+                        {isMinimized ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
+                    </button>
+                    <button
+                        style={{ background: 'transparent', border: 'none', color: 'white', padding: 4, cursor: 'pointer', display: 'flex' }}
+                        onClick={e => { e.stopPropagation(); setIsOpen(false); }}
+                    >
+                        <X size={16} />
+                    </button>
+                </div> */}
             </div>
         </>
     );
