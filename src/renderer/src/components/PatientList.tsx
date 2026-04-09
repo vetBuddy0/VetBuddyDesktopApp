@@ -3,7 +3,7 @@ import { patientService, ownerService } from '../services/patientService';
 import { consultationService } from '../services/consultationService';
 import type { Patient, Owner, Species, EzyVetPrefillData } from '../types/patient';
 import { SPECIES_OPTIONS } from '../types/patient';
-import { Bell, Calendar, Edit2, Phone, Plus, Trash2, User, Weight } from "lucide-react";
+import { Bell, Calendar, Edit2, Phone, Plus, Search, Trash2, User, Weight, X } from "lucide-react";
 import { ReminderDialog } from './ReminderDialog';
 
 interface PatientListProps {
@@ -13,6 +13,8 @@ interface PatientListProps {
   prefillData?: EzyVetPrefillData | null;
   onPatientAdded?: (patientId: number, patientName: string) => void;
 }
+
+
 
 export const PatientList: React.FC<PatientListProps> = ({
   onConsultationStart,
@@ -33,31 +35,16 @@ export const PatientList: React.FC<PatientListProps> = ({
   const [selectedPatientForReminder, setSelectedPatientForReminder] = useState<Patient | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    species: '' as Species | '',
-    breed: '',
-    age: '',
-    weight: '',
-    medicalHistory: '',
-    ownerId: 0,
+    name: '', species: '' as Species | '', breed: '', age: '', weight: '',
+    medicalHistory: '', ownerId: 0,
   });
 
-  // New owner form
   const [isNewOwner, setIsNewOwner] = useState(false);
-  const [newOwner, setNewOwner] = useState({
-    name: '',
-    phone: '',
-    email: '',
-  });
+  const [newOwner, setNewOwner] = useState({ name: '', phone: '', email: '' });
 
-  // Load patients and owners
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  // When prefill data arrives from ezyVet import, open the form pre-populated
   useEffect(() => {
     if (!prefillData) return;
     setEditingPatient(null);
@@ -66,14 +53,10 @@ export const PatientList: React.FC<PatientListProps> = ({
     setFormData({
       name: prefillData.name,
       species: (SPECIES_OPTIONS.includes(prefillData.species as Species) ? prefillData.species : '') as Species | '',
-      breed: prefillData.breed || '',
-      age: '',
-      weight: prefillData.weight || '',
-      medicalHistory: '',
-      ownerId: 0,
+      breed: prefillData.breed || '', age: '', weight: prefillData.weight || '',
+      medicalHistory: '', ownerId: 0,
     });
     setShowAddPatient(true);
-    // Scroll the form into view after render
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }, [prefillData]);
 
@@ -94,55 +77,31 @@ export const PatientList: React.FC<PatientListProps> = ({
     }
   };
 
+  const resetForm = () => {
+    setFormData({ name: '', species: '', breed: '', age: '', weight: '', medicalHistory: '', ownerId: 0 });
+    setNewOwner({ name: '', phone: '', email: '' });
+    setIsNewOwner(false);
+  };
+
   const handleAddPatient = async () => {
     try {
       setLoading(true);
       let ownerId = formData.ownerId;
-
-      // Create new owner if needed
       if (isNewOwner) {
-        if (!newOwner.name || !newOwner.phone) {
-          setError('Owner name and phone are required');
-          setLoading(false);
-          return;
-        }
+        if (!newOwner.name || !newOwner.phone) { setError('Owner name and phone are required'); setLoading(false); return; }
         const createdOwner = await ownerService.create(newOwner);
         ownerId = createdOwner.id;
       }
-
       if (!formData.name || !formData.species || !ownerId) {
-        setError('Patient name, species, and owner are required');
-        setLoading(false);
-        return;
+        setError('Patient name, species, and owner are required'); setLoading(false); return;
       }
-
       const newPatient = await patientService.create({
-        name: formData.name,
-        species: formData.species,
-        breed: formData.breed,
-        age: formData.age,
-        weight: formData.weight,
-        medicalHistory: formData.medicalHistory,
-        ownerId,
+        name: formData.name, species: formData.species, breed: formData.breed,
+        age: formData.age, weight: formData.weight, medicalHistory: formData.medicalHistory, ownerId,
       });
-
       onPatientAdded?.(newPatient.id, newPatient.name);
-
-      // Reset form
-      setFormData({
-        name: '',
-        species: '',
-        breed: '',
-        age: '',
-        weight: '',
-        medicalHistory: '',
-        ownerId: 0,
-      });
-      setNewOwner({ name: '', phone: '', email: '' });
-      setIsNewOwner(false);
+      resetForm();
       setShowAddPatient(false);
-
-      // Reload data
       await loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to add patient');
@@ -153,30 +112,15 @@ export const PatientList: React.FC<PatientListProps> = ({
 
   const handleUpdatePatient = async () => {
     if (!editingPatient) return;
-
     try {
       setLoading(true);
       await patientService.update(editingPatient.id, {
-        name: formData.name,
-        species: formData.species,
-        breed: formData.breed,
-        age: formData.age,
-        weight: formData.weight,
-        medicalHistory: formData.medicalHistory,
+        name: formData.name, species: formData.species, breed: formData.breed,
+        age: formData.age, weight: formData.weight, medicalHistory: formData.medicalHistory,
       });
-
       setEditingPatient(null);
       setShowAddPatient(false);
-      setFormData({
-        name: '',
-        species: '',
-        breed: '',
-        age: '',
-        weight: '',
-        medicalHistory: '',
-        ownerId: 0,
-      });
-
+      resetForm();
       await loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to update patient');
@@ -187,7 +131,6 @@ export const PatientList: React.FC<PatientListProps> = ({
 
   const handleDeletePatient = async (id: number) => {
     if (!confirm('Are you sure you want to delete this patient?')) return;
-
     try {
       setLoading(true);
       await patientService.delete(id);
@@ -202,28 +145,13 @@ export const PatientList: React.FC<PatientListProps> = ({
   const handleEditPatient = (patient: Patient) => {
     setEditingPatient(patient);
     setFormData({
-      name: patient.name,
-      species: patient.species as Species,
-      breed: patient.breed || '',
-      age: patient.age || '',
-      weight: patient.weight || '',
-      medicalHistory: patient.medicalHistory || '',
-      ownerId: patient.ownerId,
+      name: patient.name, species: patient.species as Species, breed: patient.breed || '',
+      age: patient.age || '', weight: patient.weight || '',
+      medicalHistory: patient.medicalHistory || '', ownerId: patient.ownerId,
     });
     setShowAddPatient(true);
   };
 
-  const handleOpenReminderDialog = (patient: Patient) => {
-    setSelectedPatientForReminder(patient);
-    setReminderDialogOpen(true);
-  };
-
-  const handleCloseReminderDialog = () => {
-    setReminderDialogOpen(false);
-    setSelectedPatientForReminder(null);
-  };
-
-  // Start Consultation functionality
   const handleStartConsultation = async (patient: Patient) => {
     if (!patient.id) return;
     try {
@@ -233,15 +161,10 @@ export const PatientList: React.FC<PatientListProps> = ({
         const proceed = confirm(
           `⚠️ Active Consultation Detected\n\n${patient.name} already has an active consultation.\n\nWould you like to view active consultations?`
         );
-        if (proceed && onViewActiveConsultations) {
-          onViewActiveConsultations();
-        }
+        if (proceed && onViewActiveConsultations) onViewActiveConsultations();
         return;
       }
-      const consultation = await consultationService.create({
-        patientId: patient.id,
-        consultationType: 'standard',
-      });
+      const consultation = await consultationService.create({ patientId: patient.id, consultationType: 'standard' });
       if (onConsultationStart) {
         onConsultationStart(consultation.id);
       } else {
@@ -252,218 +175,127 @@ export const PatientList: React.FC<PatientListProps> = ({
     }
   };
 
-  // Filter patients
   const filteredPatients = patients.filter((patient) => {
     const matchesSearch =
       patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.owner.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       patient.owner.phone.includes(searchQuery);
-
     const matchesSpecies = !selectedSpecies || patient.species === selectedSpecies;
-
     return matchesSearch && matchesSpecies;
   });
 
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="m-0 mb-4 text-xl font-semibold text-foreground">
-          Patients
-        </h2>
+      {/* Page Header */}
+      <div className="page-header">
+        <h2 className="page-title">Patients</h2>
+        <span style={{ fontSize: 11, color: 'var(--color-muted-foreground)', fontWeight: 500 }}>
+          {patients.length} record{patients.length !== 1 ? 's' : ''}
+        </span>
+      </div>
 
-        {error && (
-          <div className="alert alert-error">
-            {error}
-          </div>
-        )}
+      {error && <div className="alert alert-error">{error}</div>}
 
-        {/* Search and Filter */}
-        <div className="flex gap-2 mb-4">
+      {/* Search & Filter */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <div className="search-input-wrapper" style={{ flex: 1 }}>
+          <Search size={14} className="search-icon" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search patients..."
-            className="input flex-1"
+            placeholder="Search patients or owners..."
+            className="input"
           />
-          <select
-            value={selectedSpecies}
-            onChange={(e) => setSelectedSpecies(e.target.value)}
-            className="select max-w-[100px]"
-          >
-            <option value="">Species</option>
-            {SPECIES_OPTIONS.map((species) => (
-              <option key={species} value={species}>
-                {species}
-              </option>
-            ))}
-          </select>
         </div>
-
-        <button
-          onClick={() => {
-            setEditingPatient(null);
-            setFormData({
-              name: '',
-              species: '',
-              breed: '',
-              age: '',
-              weight: '',
-              medicalHistory: '',
-              ownerId: 0,
-            });
-            setShowAddPatient(true);
-          }}
-          className="btn btn-primary w-full gap-2"
+        <select
+          value={selectedSpecies}
+          onChange={(e) => setSelectedSpecies(e.target.value)}
+          className="select"
+          style={{ maxWidth: 110 }}
         >
-          <Plus className="w-4 h-4" />
-          Add Patient
-        </button>
+          <option value="">All species</option>
+          {SPECIES_OPTIONS.map((species) => (
+            <option key={species} value={species}>{species}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Add/Edit Patient Form */}
+      {/* Add Patient Button */}
+      <button
+        onClick={() => { resetForm(); setEditingPatient(null); setShowAddPatient(true); }}
+        className="btn btn-primary"
+        style={{ width: '100%', marginBottom: 14 }}
+      >
+        <Plus size={14} />
+        Add New Patient
+      </button>
+
+      {/* Add/Edit Form */}
       {showAddPatient && (
-        <div ref={formRef} className="card mb-6">
+        <div ref={formRef} className="card" style={{ marginBottom: 14, animation: 'scaleIn 0.2s ease' }}>
           <div className="card-header">
-            <h3 className="card-title">
-              {editingPatient ? 'Edit Patient' : 'Add Patient'}
-            </h3>
-          </div>
-
-          <div className="card-content flex flex-col gap-4">
-            <input
-              type="text"
-              placeholder="Patient Name *"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="input"
-            />
-
-            <select
-              value={formData.species}
-              onChange={(e) => setFormData({ ...formData, species: e.target.value as Species })}
-              className="select"
+            <span className="card-title">{editingPatient ? 'Edit Patient' : 'New Patient'}</span>
+            <button
+              onClick={() => { setShowAddPatient(false); setEditingPatient(null); resetForm(); }}
+              className="btn-icon"
             >
-              <option value="">Select Species *</option>
-              {SPECIES_OPTIONS.map((species) => (
-                <option key={species} value={species}>
-                  {species}
-                </option>
-              ))}
+              <X size={14} />
+            </button>
+          </div>
+          <div className="card-content" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input type="text" placeholder="Patient name *" value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input" />
+            <select value={formData.species}
+              onChange={(e) => setFormData({ ...formData, species: e.target.value as Species })} className="select">
+              <option value="">Select species *</option>
+              {SPECIES_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-
-            <input
-              type="text"
-              placeholder="Breed"
-              value={formData.breed}
-              onChange={(e) => setFormData({ ...formData, breed: e.target.value })}
-              className="input"
-            />
-
-            <input
-              type="text"
-              placeholder="Age (e.g., 2 years)"
-              value={formData.age}
-              onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-              className="input"
-            />
-
-            <input
-              type="text"
-              placeholder="Weight (e.g., 15 kg)"
-              value={formData.weight}
-              onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-              className="input"
-            />
-
-            <textarea
-              placeholder="Medical History"
-              value={formData.medicalHistory}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <input type="text" placeholder="Breed" value={formData.breed}
+                onChange={(e) => setFormData({ ...formData, breed: e.target.value })} className="input" />
+              <input type="text" placeholder="Age (e.g. 2 yrs)" value={formData.age}
+                onChange={(e) => setFormData({ ...formData, age: e.target.value })} className="input" />
+            </div>
+            <input type="text" placeholder="Weight (e.g. 15 kg)" value={formData.weight}
+              onChange={(e) => setFormData({ ...formData, weight: e.target.value })} className="input" />
+            <textarea placeholder="Medical history" value={formData.medicalHistory}
               onChange={(e) => setFormData({ ...formData, medicalHistory: e.target.value })}
-              rows={3}
-              className="input resize-y"
-            />
+              rows={2} className="input" style={{ resize: 'vertical' }} />
 
             {!editingPatient && (
               <>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={isNewOwner}
-                    onChange={(e) => setIsNewOwner(e.target.checked)}
-                    id="newOwner"
-                  />
-                  <label htmlFor="newOwner" className="text-sm">
-                    Create new owner
-                  </label>
-                </div>
-
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={isNewOwner}
+                    onChange={(e) => setIsNewOwner(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+                  Create new owner
+                </label>
                 {isNewOwner ? (
                   <>
-                    <input
-                      type="text"
-                      placeholder="Owner Name *"
-                      value={newOwner.name}
-                      onChange={(e) => setNewOwner({ ...newOwner, name: e.target.value })}
-                      className="input"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Owner Phone (with country code) *"
-                      value={newOwner.phone}
-                      onChange={(e) => setNewOwner({ ...newOwner, phone: e.target.value })}
-                      className="input"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Owner Email"
-                      value={newOwner.email}
-                      onChange={(e) => setNewOwner({ ...newOwner, email: e.target.value })}
-                      className="input"
-                    />
+                    <input type="text" placeholder="Owner name *" value={newOwner.name}
+                      onChange={(e) => setNewOwner({ ...newOwner, name: e.target.value })} className="input" />
+                    <input type="tel" placeholder="Owner phone *" value={newOwner.phone}
+                      onChange={(e) => setNewOwner({ ...newOwner, phone: e.target.value })} className="input" />
+                    <input type="email" placeholder="Owner email" value={newOwner.email}
+                      onChange={(e) => setNewOwner({ ...newOwner, email: e.target.value })} className="input" />
                   </>
                 ) : (
-                  <select
-                    value={formData.ownerId}
-                    onChange={(e) => setFormData({ ...formData, ownerId: Number(e.target.value) })}
-                    className="select"
-                  >
-                    <option value={0}>Select Owner *</option>
-                    {owners.map((owner) => (
-                      <option key={owner.id} value={owner.id}>
-                        {owner.name} - {owner.phone}
-                      </option>
-                    ))}
+                  <select value={formData.ownerId}
+                    onChange={(e) => setFormData({ ...formData, ownerId: Number(e.target.value) })} className="select">
+                    <option value={0}>Select owner *</option>
+                    {owners.map((o) => <option key={o.id} value={o.id}>{o.name} — {o.phone}</option>)}
                   </select>
                 )}
               </>
             )}
 
-            <div className="flex gap-2">
-              <button
-                onClick={editingPatient ? handleUpdatePatient : handleAddPatient}
-                disabled={loading}
-                className="btn btn-primary flex-1"
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="spinner"></div>
-                    Saving...
-                  </div>
-                ) : (
-                  editingPatient ? 'Update' : 'Add Patient'
-                )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button onClick={editingPatient ? handleUpdatePatient : handleAddPatient}
+                disabled={loading} className="btn btn-primary" style={{ flex: 1 }}>
+                {loading ? <><span className="spinner" style={{ borderTopColor: 'white', borderColor: 'rgba(255,255,255,0.3)' }} /> Saving...</> : (editingPatient ? 'Update Patient' : 'Add Patient')}
               </button>
-              <button
-                onClick={() => {
-                  setShowAddPatient(false);
-                  setEditingPatient(null);
-                }}
-                disabled={loading}
-                className="btn btn-secondary"
-              >
-                Cancel
-              </button>
+              <button onClick={() => { setShowAddPatient(false); setEditingPatient(null); resetForm(); }}
+                disabled={loading} className="btn btn-secondary">Cancel</button>
             </div>
           </div>
         </div>
@@ -471,110 +303,85 @@ export const PatientList: React.FC<PatientListProps> = ({
 
       {/* Patient List */}
       {loading && !showAddPatient ? (
-        <div className="text-muted text-center p-8">
-          <div className="spinner m-auto mb-4 w-6 h-6"></div>
-          Loading...
+        <div className="empty-state">
+          <div className="spinner" style={{ width: 24, height: 24 }} />
+          <span style={{ fontSize: 12 }}>Loading patients...</span>
         </div>
       ) : filteredPatients.length === 0 ? (
-        <div className="text-muted text-center p-8">
-          No patients found
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <User size={22} />
+          </div>
+          <span className="empty-state-title">{searchQuery ? 'No results found' : 'No patients yet'}</span>
+          <span className="empty-state-desc">
+            {searchQuery ? 'Try a different search term.' : 'Add your first patient using the button above.'}
+          </span>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filteredPatients.map((patient) => (
-            <div key={patient.id} className="card">
+            <div key={patient.id} className="card card-hover" style={{ animation: 'fadeSlideIn 0.2s ease-out' }}>
               <div className="card-content">
-                {/* Header with Name and Action Icons */}
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-semibold m-0">
-                    {patient.name}
-                  </h3>
-                  <div className="flex gap-1">
-                    {/* Reminder Icon */}
-                    <button
-                      onClick={() => handleOpenReminderDialog(patient)}
-                      className="p-2 rounded-full hover:bg-orange-50 transition-colors"
-                      title="Set Reminder"
-                    >
-                      <Bell className="w-4 h-4 text-orange-600"/>
-                    </button>
-                    {/* Edit Icon */}
-                    <button
-                      onClick={() => handleEditPatient(patient)}
-                      className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 className="w-4 h-4"/>
-                    </button>
-                    {/* Delete Icon */}
-                    <button
-                      onClick={() => handleDeletePatient(patient.id)}
-                      className="p-2 rounded-full hover:bg-red-50 transition-colors text-red-600"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4"/>
-                    </button>
-                  </div>
-                </div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  {/* Main Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <div>
+                        <h3 style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.3px', color: 'var(--color-foreground)', marginBottom: 3 }}>
+                          {patient.name}
+                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span className="badge badge-primary">{patient.species}</span>
+                          {patient.age && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--color-muted-foreground)' }}>
+                              <Calendar size={10} />{patient.age}
+                            </span>
+                          )}
+                          {patient.weight && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--color-muted-foreground)' }}>
+                              <Weight size={10} />{patient.weight}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Action icon row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                        <button onClick={() => { setReminderDialogOpen(true); setSelectedPatientForReminder(patient); }}
+                          className="btn-icon warning" title="Set Reminder">
+                          <Bell size={13} />
+                        </button>
+                        <button onClick={() => handleEditPatient(patient)} className="btn-icon primary" title="Edit">
+                          <Edit2 size={13} />
+                        </button>
+                        <button onClick={() => handleDeletePatient(patient.id)} className="btn-icon danger" title="Delete">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Species, Age, Weight Row */}
-                <div className="flex items-center gap-4 mb-2 text-sm text-gray-600">
-                  <span className="badge badge-primary">
-                    {patient.species}
-                  </span>
-                  {patient.age && (
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4"/>
-                      <span>{patient.age}</span>
+                    {/* Owner info */}
+                    <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--color-foreground)', fontWeight: 500 }}>
+                          <User size={11} style={{ color: 'var(--color-muted-foreground)' }} />
+                          {patient.owner.name === 'Owner' ? 'Unknown User' : patient.owner.name}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--color-muted-foreground)' }}>
+                          <Phone size={11} />
+                          {patient.owner.phone === '9999999999' ? 'No phone' : patient.owner.phone}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => handleStartConsultation(patient)} disabled={loading}
+                          className="btn btn-secondary btn-sm">
+                          Start
+                        </button>
+                        <button onClick={() => onViewSOAPNotes?.(patient.id, patient.name)} disabled={loading}
+                          className="btn btn-primary btn-sm">
+                          SOAP
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  {patient.weight && (
-                    <div className="flex items-center gap-1">
-                      <Weight className="w-4 h-4"/>
-                      <span>{patient.weight}</span>
-                    </div>
-                  )}
-                </div>
-                <div className='flex justify-between items-center pt-2 border-t'>
-                  {/* Owner Info */}
-                  <div className="text-sm">
-                    <div className="flex items-center gap-2 text-gray-700 mb-1">
-                      <User className="w-4 h-4"/>
-                      <span className="font-medium">{patient.owner.name === "Owner" ? "Unknown User" : patient.owner.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <Phone className="w-4 h-4"/>
-                      <span className="text-gray-600">{patient.owner.phone === "9999999999" ? "No Phone Number" : patient.owner.phone}</span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    {/* Start Consultation Button */}
-                    <button
-                      onClick={() => handleStartConsultation(patient)}
-                      disabled={loading}
-                      className="btn btn-secondary h-8"
-                      style={{
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        opacity: loading ? 0.6 : 1
-                      }}
-                    >
-                      Start
-                    </button>
-
-                    {/* View SOAP Notes Button */}
-                    <button
-                      onClick={() => onViewSOAPNotes?.(patient.id, patient.name)}
-                      disabled={loading}
-                      className="btn btn-primary h-8"
-                      style={{
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        opacity: loading ? 0.6 : 1
-                      }}
-                    >
-                      SOAP
-                    </button>
                   </div>
                 </div>
               </div>
@@ -583,11 +390,10 @@ export const PatientList: React.FC<PatientListProps> = ({
         </div>
       )}
 
-      {/* Reminder Dialog */}
       {reminderDialogOpen && selectedPatientForReminder && (
         <ReminderDialog
           isOpen={reminderDialogOpen}
-          onClose={handleCloseReminderDialog}
+          onClose={() => { setReminderDialogOpen(false); setSelectedPatientForReminder(null); }}
           patient={selectedPatientForReminder}
         />
       )}

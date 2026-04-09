@@ -1,7 +1,29 @@
-// SOAP Template types for VetBuddy Extension
-// Mirrors the types from the backend shared/types/soapTemplate.ts
+// SOAP / Note Template types for VetBuddy Desktop
+// Standards with the flexible NoteTemplate schema on the backend
 
-// V2 Template Types (Instruction-based, free-form text per SOAP section)
+export interface TemplateSection {
+  id: string;
+  title: string;
+  instructions?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  subsections?: TemplateSection[];
+  order: number;
+}
+
+export interface NoteTemplateDefinition {
+  version: number;
+  name: string;
+  description?: string;
+  sections: TemplateSection[];
+  metadata?: {
+    createdBy?: string;
+    createdAt?: string;
+    isSystemTemplate?: boolean;
+  };
+}
+
+// Fixed-structure legacy type (still used in some places for mapping)
 export interface SoapSectionInstructions {
   title: string;
   instructions: string;
@@ -24,38 +46,19 @@ export interface SoapTemplateDefinitionV2 {
   };
 }
 
-// V2 Output structure - each section has generated text content
-export interface SoapGeneratedContentV2 {
-  version: 2;
-  templateId?: number | null;
-  sections: {
-    subjective: {
-      content: string;
-      evidence?: string[];
-    };
-    objective: {
-      content: string;
-      evidence?: string[];
-    };
-    assessment: {
-      content: string;
-      evidence?: string[];
-    };
-    plan: {
-      content: string;
-      evidence?: string[];
-    };
-  };
-}
+// Union type for template definitions to support smooth transition
+export type AnyTemplateDefinition = NoteTemplateDefinition | SoapTemplateDefinitionV2;
 
 // Template entity from database
 export interface SOAPTemplate {
   id: number;
   name: string;
   description?: string;
-  templateDefinition: SoapTemplateDefinitionV2;
+  templateDefinition: AnyTemplateDefinition;
   isDefault: boolean;
-  version: string; // e.g., "v2"
+  version: string; // e.g., "v1", "v2"
+  isSystemTemplate?: boolean;
+  category?: string;
   createdAt: string;
   updatedAt: string;
   userId?: number;
@@ -66,7 +69,7 @@ export interface SOAPTemplate {
 export interface CreateSOAPTemplatePayload {
   name: string;
   description?: string;
-  templateDefinition: SoapTemplateDefinitionV2;
+  templateDefinition: AnyTemplateDefinition;
   isDefault?: boolean;
 }
 
@@ -74,6 +77,6 @@ export interface CreateSOAPTemplatePayload {
 export interface UpdateSOAPTemplatePayload {
   name?: string;
   description?: string;
-  templateDefinition?: SoapTemplateDefinitionV2;
+  templateDefinition?: AnyTemplateDefinition;
   isDefault?: boolean;
 }
