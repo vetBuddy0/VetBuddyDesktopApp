@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Loader2,
   CheckCircle,
+  Check,
   Edit2,
   X,
   RefreshCw,
@@ -47,7 +48,24 @@ function EditableClinicalNoteSection({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(section.content || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const isExpanded = expandedSections[section.sectionId];
+
+  const handleCopySelf = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const formatSectionText = (s: ClinicalNoteSection, depth = 0): string => {
+      const indent = '  '.repeat(depth);
+      let text = `${indent}${s.title}:\n${indent}${s.content || 'Not specified'}`;
+      if (s.subsections?.length)
+        text += '\n' + s.subsections.map(sub => formatSectionText(sub, depth + 1)).join('\n');
+      return text;
+    };
+    try {
+      await navigator.clipboard.writeText(formatSectionText(section));
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {}
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -74,22 +92,31 @@ function EditableClinicalNoteSection({
       marginLeft: depth > 0 ? 12 : 0,
       marginTop: depth > 0 ? 8 : 0,
     }}>
-      <button
-        onClick={() => onToggle(section.sectionId)}
-        style={{
-          width: '100%', padding: '9px 13px',
-          background: 'var(--color-muted)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          border: 'none', cursor: 'pointer', transition: 'background 0.15s',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-purple-100)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-muted)')}
-      >
-        <span style={{ fontWeight: 600, fontSize: depth > 0 ? 12 : 12.5, color: 'var(--color-foreground)', letterSpacing: '-0.1px' }}>
-          {section.title}
-        </span>
-        {isExpanded ? <ChevronUp size={15} style={{ color: 'var(--color-muted-foreground)' }} /> : <ChevronDown size={15} style={{ color: 'var(--color-muted-foreground)' }} />}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-muted)' }}>
+        <button
+          onClick={() => onToggle(section.sectionId)}
+          style={{
+            flex: 1, padding: '9px 13px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            border: 'none', cursor: 'pointer', background: 'transparent', transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-purple-100)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <span style={{ fontWeight: 600, fontSize: depth > 0 ? 12 : 12.5, color: 'var(--color-foreground)', letterSpacing: '-0.1px' }}>
+            {section.title}
+          </span>
+          {isExpanded ? <ChevronUp size={15} style={{ color: 'var(--color-muted-foreground)' }} /> : <ChevronDown size={15} style={{ color: 'var(--color-muted-foreground)' }} />}
+        </button>
+        <button
+          className="btn-icon"
+          title={`Copy ${section.title}`}
+          onClick={handleCopySelf}
+          style={{ marginRight: 8, opacity: 0.55, flexShrink: 0 }}
+        >
+          {isCopied ? <Check size={12} style={{ color: 'var(--color-success)' }} /> : <Copy size={12} />}
+        </button>
+      </div>
 
       {isExpanded && (
         <div style={{ padding: '12px 13px', background: 'var(--color-card)', borderTop: '1px solid var(--color-border)' }}>
@@ -179,6 +206,7 @@ export function SOAPNoteGenerator({
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [pasting, setPasting] = useState(false);
+  const [copiedLegacyKey, setCopiedLegacyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -1060,15 +1088,33 @@ export function SOAPNoteGenerator({
 
             return (
               <div key={section} style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                <button
-                  onClick={() => toggleSection(section)}
-                  style={{ width: '100%', padding: '9px 13px', background: 'var(--color-muted)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-purple-100)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-muted)')}
-                >
-                  <span style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--color-foreground)' }}>{sectionLabels[section]}</span>
-                  {expandedSections[section] ? <ChevronUp size={15} style={{ color: 'var(--color-muted-foreground)' }} /> : <ChevronDown size={15} style={{ color: 'var(--color-muted-foreground)' }} />}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-muted)' }}>
+                  <button
+                    onClick={() => toggleSection(section)}
+                    style={{ flex: 1, padding: '9px 13px', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'background 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-purple-100)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 12.5, color: 'var(--color-foreground)' }}>{sectionLabels[section]}</span>
+                    {expandedSections[section] ? <ChevronUp size={15} style={{ color: 'var(--color-muted-foreground)' }} /> : <ChevronDown size={15} style={{ color: 'var(--color-muted-foreground)' }} />}
+                  </button>
+                  <button
+                    className="btn-icon"
+                    title={`Copy ${sectionLabels[section]}`}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!content) return;
+                      try {
+                        await navigator.clipboard.writeText(`${sectionLabels[section]}:\n${content}`);
+                        setCopiedLegacyKey(section);
+                        setTimeout(() => setCopiedLegacyKey(null), 2000);
+                      } catch {}
+                    }}
+                    style={{ marginRight: 8, opacity: 0.55, flexShrink: 0 }}
+                  >
+                    {copiedLegacyKey === section ? <Check size={12} style={{ color: 'var(--color-success)' }} /> : <Copy size={12} />}
+                  </button>
+                </div>
 
                 {expandedSections[section] && (
                   <div style={{ padding: '12px 13px', background: 'var(--color-card)', borderTop: '1px solid var(--color-border)' }}>

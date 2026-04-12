@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { soapNoteService, type ClinicalNote, type ClinicalNoteSection } from '../services/soapNoteService';
 import { patientService } from '../services/patientService';
-import { FileText, ChevronDown, ChevronUp, Calendar, ArrowLeft, Clipboard, Check, RefreshCw } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, Calendar, ArrowLeft, Clipboard, Check, RefreshCw, Copy } from 'lucide-react';
 import type { Patient } from '../types/patient';
 import type { SOAPNote } from '../types/soapNote';
 
@@ -30,6 +30,7 @@ export const SOAPNoteList: React.FC<SOAPNoteListProps> = ({
   const [expandedNoteId, setExpandedNoteId] = useState<number | null>(null);
   const [copyLoading, setCopyLoading] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [copiedSectionKey, setCopiedSectionKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedPatientId !== undefined && selectedPatientId !== null) {
@@ -114,6 +115,35 @@ export const SOAPNoteList: React.FC<SOAPNoteListProps> = ({
       alert(`Failed to copy: ${err.message}`);
     } finally {
       setCopyLoading(null);
+    }
+  };
+
+  const handleCopySection = async (section: ClinicalNoteSection, consultationId: number) => {
+    const formatSectionText = (s: ClinicalNoteSection, depth = 0): string => {
+      const indent = '  '.repeat(depth);
+      let text = `${indent}${s.title}:\n${indent}${s.content || 'Not specified'}`;
+      if (s.subsections?.length)
+        text += '\n' + s.subsections.map(sub => formatSectionText(sub, depth + 1)).join('\n');
+      return text;
+    };
+    const key = `${consultationId}-${section.sectionId}`;
+    try {
+      await navigator.clipboard.writeText(formatSectionText(section));
+      setCopiedSectionKey(key);
+      setTimeout(() => setCopiedSectionKey(null), 2000);
+    } catch (err: any) {
+      alert(`Failed to copy: ${err.message}`);
+    }
+  };
+
+  const handleCopyLegacySection = async (label: string, content: string, consultationId: number, sectionKey: string) => {
+    const key = `${consultationId}-soap-${sectionKey}`;
+    try {
+      await navigator.clipboard.writeText(`${label}:\n${content}`);
+      setCopiedSectionKey(key);
+      setTimeout(() => setCopiedSectionKey(null), 2000);
+    } catch (err: any) {
+      alert(`Failed to copy: ${err.message}`);
     }
   };
 
@@ -203,15 +233,27 @@ export const SOAPNoteList: React.FC<SOAPNoteListProps> = ({
                   borderLeft: depth > 0 ? '2px solid var(--color-border)' : 'none',
                 }}
               >
-                <h4 style={{
-                  fontWeight: 600,
-                  fontSize: depth === 0 ? 12.5 : 11.5,
-                  marginBottom: 3,
-                  color: 'var(--color-foreground)',
-                  letterSpacing: '-0.1px',
-                }}>
-                  {section.title}
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <h4 style={{
+                    fontWeight: 600,
+                    fontSize: depth === 0 ? 12.5 : 11.5,
+                    color: 'var(--color-foreground)',
+                    letterSpacing: '-0.1px',
+                    margin: 0,
+                  }}>
+                    {section.title}
+                  </h4>
+                  <button
+                    className="btn-icon"
+                    title={`Copy ${section.title}`}
+                    onClick={(e) => { e.stopPropagation(); handleCopySection(section, consultation.id); }}
+                    style={{ opacity: 0.55, padding: '2px 4px', flexShrink: 0 }}
+                  >
+                    {copiedSectionKey === `${consultation.id}-${section.sectionId}`
+                      ? <Check size={12} style={{ color: 'var(--color-success)' }} />
+                      : <Copy size={12} />}
+                  </button>
+                </div>
                 <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--color-foreground)', lineHeight: 1.6 }}>
                   {section.content || <span style={{ color: 'var(--color-muted-foreground)', fontStyle: 'italic' }}>No content</span>}
                 </p>
@@ -290,9 +332,21 @@ export const SOAPNoteList: React.FC<SOAPNoteListProps> = ({
                         {(['subjective', 'objective', 'assessment', 'plan'] as const).map(key =>
                           consultation.soapNote?.[key] ? (
                             <div key={key} style={{ marginBottom: 10 }}>
-                              <h4 style={{ fontWeight: 600, fontSize: 12, marginBottom: 3, color: 'var(--color-foreground)', textTransform: 'capitalize' }}>
-                                {key}
-                              </h4>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                                <h4 style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-foreground)', textTransform: 'capitalize', margin: 0 }}>
+                                  {key}
+                                </h4>
+                                <button
+                                  className="btn-icon"
+                                  title={`Copy ${key}`}
+                                  onClick={(e) => { e.stopPropagation(); handleCopyLegacySection(key.charAt(0).toUpperCase() + key.slice(1), consultation.soapNote![key] as string, consultation.id, key); }}
+                                  style={{ opacity: 0.55, padding: '2px 4px', flexShrink: 0 }}
+                                >
+                                  {copiedSectionKey === `${consultation.id}-soap-${key}`
+                                    ? <Check size={12} style={{ color: 'var(--color-success)' }} />
+                                    : <Copy size={12} />}
+                                </button>
+                              </div>
                               <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--color-foreground)', lineHeight: 1.6 }}>
                                 {consultation.soapNote[key]}
                               </p>
@@ -305,9 +359,21 @@ export const SOAPNoteList: React.FC<SOAPNoteListProps> = ({
                             background: 'rgba(34,197,94,0.07)',
                             border: '1px solid rgba(34,197,94,0.18)',
                           }}>
-                            <h4 style={{ fontWeight: 600, fontSize: 11.5, marginBottom: 4, color: 'var(--color-success)' }}>
-                              Client Summary
-                            </h4>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <h4 style={{ fontWeight: 600, fontSize: 11.5, color: 'var(--color-success)', margin: 0 }}>
+                                Client Summary
+                              </h4>
+                              <button
+                                className="btn-icon"
+                                title="Copy Client Summary"
+                                onClick={(e) => { e.stopPropagation(); handleCopyLegacySection('Client Summary', consultation.soapNote!.clientSummary as string, consultation.id, 'clientSummary'); }}
+                                style={{ opacity: 0.55, padding: '2px 4px', flexShrink: 0 }}
+                              >
+                                {copiedSectionKey === `${consultation.id}-soap-clientSummary`
+                                  ? <Check size={12} style={{ color: 'var(--color-success)' }} />
+                                  : <Copy size={12} />}
+                              </button>
+                            </div>
                             <p style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--color-foreground)', lineHeight: 1.6 }}>
                               {consultation.soapNote.clientSummary}
                             </p>
