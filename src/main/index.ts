@@ -39,13 +39,15 @@ function registerShowShortcut(key: string): boolean {
     try { globalShortcut.unregister(currentShowShortcut); } catch { /* ignore */ }
   }
   const ok = globalShortcut.register(key, () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isVisible() && mainWindow.isFocused()) {
-      mainWindow.hide();
-    } else {
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (mainWindow.isVisible() && mainWindow.isFocused()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    } catch { /* window destroyed between check and call — ignore */ }
   });
   if (ok) {
     currentShowShortcut = key;
@@ -216,6 +218,7 @@ ipcMain.handle("updater:install", async () => {
       `if [ -n "$NEW" ]; then`,
       `  rm -rf "${appPath}"`,
       `  cp -Rp "$NEW" "${appDir}/"`,
+      `  xattr -r -d com.apple.quarantine "${appPath}" 2>/dev/null || true`,
       `  open "${appPath}"`,
       `fi`,
       `rm -rf "${tmpExtract}"`,
@@ -297,9 +300,11 @@ app.whenReady().then(() => {
 
   // Minimise / restore
   globalShortcut.register("CommandOrControl+Shift+M", () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    else mainWindow.minimize();
+    try {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      else mainWindow.minimize();
+    } catch { /* ignore */ }
   });
 
   // Tab switchers Cmd+Shift+1..5
@@ -312,9 +317,11 @@ app.whenReady().then(() => {
   ];
   for (const [key, view] of tabKeys) {
     globalShortcut.register(key, () => {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      if (!mainWindow.isVisible()) { mainWindow.show(); mainWindow.focus(); }
-      mainWindow.webContents.send("nav:go", view);
+      try {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (!mainWindow.isVisible()) { mainWindow.show(); mainWindow.focus(); }
+        mainWindow.webContents.send("nav:go", view);
+      } catch { /* ignore */ }
     });
   }
 

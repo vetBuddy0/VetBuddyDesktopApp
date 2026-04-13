@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, X, ChevronDown, ChevronUp, Zap, RotateCcw, AlertCircle } from 'lucide-react';
 
 const RELEASES_URL = 'https://vetbuddy-385b2.web.app/updates/releases.json';
-const AUTO_RESTART_SECS = 10;
 
 type UpdateState =
   | { phase: 'idle' }
@@ -18,8 +17,7 @@ export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [releaseNote, setReleaseNote] = useState<ReleaseNote | null>(null);
-  const [countdown, setCountdown] = useState(AUTO_RESTART_SECS);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [restarting, setRestarting] = useState(false);
 
   // Subscribe to updater events from main process
   useEffect(() => {
@@ -42,8 +40,7 @@ export function UpdateBanner() {
       } else if (status.type === 'downloaded') {
         setState({ phase: 'downloaded', version: status.version });
         setDismissed(false);
-        // Start countdown
-        setCountdown(AUTO_RESTART_SECS);
+        setRestarting(false);
       } else if (status.type === 'error') {
         setState({ phase: 'error', message: status.message });
         setDismissed(false);
@@ -54,39 +51,17 @@ export function UpdateBanner() {
     return unsubscribe;
   }, []);
 
-  // Countdown timer that fires after download completes
-  useEffect(() => {
-    if (state.phase !== 'downloaded' || dismissed) {
-      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
-      return;
-    }
-    setCountdown(AUTO_RESTART_SECS);
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current!);
-          countdownRef.current = null;
-          (window as any).electron?.updater?.install?.();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
-  }, [state.phase, dismissed]);
-
   const handleDownload = useCallback(() => {
     (window as any).electron?.updater?.download?.();
   }, []);
 
   const handleInstallNow = useCallback(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current);
+    setRestarting(true);
     (window as any).electron?.updater?.install?.();
   }, []);
 
   const handleDismiss = useCallback(() => {
     setDismissed(true);
-    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
   }, []);
 
   if (state.phase === 'idle' || dismissed) return null;
@@ -199,7 +174,7 @@ export function UpdateBanner() {
     );
   }
 
-  // ── Downloaded — countdown to restart ───────────────────────────────────────
+  // ── Downloaded — manual restart button ──────────────────────────────────────
   if (state.phase === 'downloaded') {
     return (
       <div style={{
@@ -223,51 +198,45 @@ export function UpdateBanner() {
               v{state.version} ready to install
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-muted-foreground)', marginTop: 1 }}>
-              Auto-restarting in <strong style={{ color: 'rgb(74,222,128)' }}>{countdown}s</strong>
+              {restarting ? 'Restarting… the app will reopen in a moment' : 'Quit and relaunch to apply the update'}
             </div>
           </div>
-          <button
-            onClick={handleDismiss}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted-foreground)', padding: 4 }}
-            title="Cancel restart"
-          >
-            <X size={13} />
-          </button>
+          {!restarting && (
+            <button
+              onClick={handleDismiss}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted-foreground)', padding: 4 }}
+              title="Remind me later"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
 
-        {/* Countdown bar */}
-        <div style={{ height: 3, background: 'rgba(34,197,94,0.15)' }}>
-          <div style={{
-            height: '100%',
-            width: `${(countdown / AUTO_RESTART_SECS) * 100}%`,
-            background: 'rgb(34,197,94)',
-            transition: 'width 1s linear',
-          }} />
-        </div>
-
-        <div style={{ padding: '10px 12px', display: 'flex', gap: 8 }}>
-          <button
-            onClick={handleInstallNow}
-            style={{
-              flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: 'rgb(22,163,74)', color: 'white',
-              fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <RotateCcw size={13} />
-            Restart Now
-          </button>
-          <button
-            onClick={handleDismiss}
-            style={{
-              padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', cursor: 'pointer',
-              background: 'transparent', color: 'var(--color-muted-foreground)',
-              fontSize: 12, fontWeight: 600,
-            }}
-          >
-            Later
-          </button>
-        </div>
+        {!restarting && (
+          <div style={{ padding: '0 12px 12px', display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleInstallNow}
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: 'rgb(22,163,74)', color: 'white',
+                fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              <RotateCcw size={13} />
+              Restart Now
+            </button>
+            <button
+              onClick={handleDismiss}
+              style={{
+                padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', cursor: 'pointer',
+                background: 'transparent', color: 'var(--color-muted-foreground)',
+                fontSize: 12, fontWeight: 600,
+              }}
+            >
+              Later
+            </button>
+          </div>
+        )}
       </div>
     );
   }

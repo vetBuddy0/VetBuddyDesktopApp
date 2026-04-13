@@ -1,11 +1,11 @@
-version: 1.1.8
+version: 1.1.9
 files:
-  - url: VetBuddy Overlay-1.1.8-arm64-mac.zip
-    sha512: CYTkkclP+MdjKhuVmKXsREgcYwd457s0X2ISnydDQDQScIJW329fzXBHoTEJeg1vyhy7owsooxJjz4wHq5CUoQ==
-    size: 98177752
-  - url: VetBuddy Overlay-1.1.8-arm64.dmg
-    sha512: otc+MnfT0ouKcGVJCYDswySug07pcGHeCuEPVCXMm8rMmpdB27XK+DpF0h9WQoTn8aMwXu+jgiXkwV++XHMfDg==
-    size: 101789698
-path: VetBuddy Overlay-1.1.8-arm64-mac.zip
-sha512: CYTkkclP+MdjKhuVmKXsREgcYwd457s0X2ISnydDQDQScIJW329fzXBHoTEJeg1vyhy7owsooxJjz4wHq5CUoQ==
-releaseDate: '2026-04-13T12:49:20.887Z'
+  - url: VetBuddy Overlay-1.1.9-arm64-mac.zip
+    sha512: CsPl/F73YXHhEUDKtgZaEwyq1kzA6KvgUAFIPTtv881I8QasWRruftinBE6Jmi6zzHWm0OsvmFYLN5JzusYP0Q==
+    size: 98177524
+  - url: VetBuddy Overlay-1.1.9-arm64.dmg
+    sha512: DumWk5c69GwwRHJv1H5ibMuD53xfCSs88OzHiAvOkSdbu11ScPB762NE8rqbT/RKHNZw/xhNQBS2EqErg/p9Tg==
+    size: 101788565
+path: VetBuddy Overlay-1.1.9-arm64-mac.zip
+sha512: CsPl/F73YXHhEUDKtgZaEwyq1kzA6KvgUAFIPTtv881I8QasWRruftinBE6Jmi6zzHWm0OsvmFYLN5JzusYP0Q==
+releaseDate: '2026-04-13T20:02:22.679Z'
