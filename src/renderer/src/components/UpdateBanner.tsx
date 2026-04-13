@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Download, X, ChevronDown, ChevronUp, Zap, RotateCcw, AlertCircle } from 'lucide-react';
+import { Download, X, ChevronDown, ChevronUp, Zap, CheckCircle } from 'lucide-react';
 
 const RELEASES_URL = 'https://vetbuddy-385b2.web.app/updates/releases.json';
 
@@ -17,15 +17,12 @@ export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [releaseNote, setReleaseNote] = useState<ReleaseNote | null>(null);
-  const [restarting, setRestarting] = useState(false);
-
   // Subscribe to updater events from main process
   useEffect(() => {
     const el = (window as any).electron;
     if (!el?.updater?.onStatus) return;
 
     const unsubscribe = el.updater.onStatus((status: any) => {
-      console.log('[UpdateBanner] received status:', status);
       if (status.type === 'available') {
         setState({ phase: 'available', version: status.version });
         setDismissed(false);
@@ -40,12 +37,10 @@ export function UpdateBanner() {
       } else if (status.type === 'downloaded') {
         setState({ phase: 'downloaded', version: status.version });
         setDismissed(false);
-        setRestarting(false);
       } else if (status.type === 'error') {
-        setState({ phase: 'error', message: status.message });
-        setDismissed(false);
+        // Silently ignore update errors — don't show error banner to users
+        setState({ phase: 'idle' });
       }
-      // 'checking' and 'up-to-date' leave banner as-is (don't flash)
     });
 
     return unsubscribe;
@@ -53,11 +48,6 @@ export function UpdateBanner() {
 
   const handleDownload = useCallback(() => {
     (window as any).electron?.updater?.download?.();
-  }, []);
-
-  const handleInstallNow = useCallback(() => {
-    setRestarting(true);
-    (window as any).electron?.updater?.install?.();
   }, []);
 
   const handleDismiss = useCallback(() => {
@@ -174,7 +164,7 @@ export function UpdateBanner() {
     );
   }
 
-  // ── Downloaded — manual restart button ──────────────────────────────────────
+  // ── Downloaded — instruct user to quit and reopen ───────────────────────────
   if (state.phase === 'downloaded') {
     return (
       <div style={{
@@ -182,91 +172,34 @@ export function UpdateBanner() {
         borderRadius: 10,
         background: 'linear-gradient(135deg, rgba(22,163,74,0.15) 0%, rgba(34,197,94,0.1) 100%)',
         border: '1.5px solid rgba(34,197,94,0.5)',
-        overflow: 'hidden',
-        boxShadow: '0 2px 12px rgba(22,163,74,0.15)',
+        padding: '10px 12px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           <div style={{
-            width: 28, height: 28, borderRadius: 7,
+            width: 28, height: 28, borderRadius: 7, flexShrink: 0, marginTop: 1,
             background: 'rgba(34,197,94,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <RotateCcw size={14} style={{ color: 'rgb(74,222,128)' }} />
+            <CheckCircle size={14} style={{ color: 'rgb(74,222,128)' }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-foreground)' }}>
-              v{state.version} ready to install
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-foreground)', marginBottom: 4 }}>
+              v{state.version} downloaded
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-muted-foreground)', marginTop: 1 }}>
-              {restarting ? 'Restarting… the app will reopen in a moment' : 'Quit and relaunch to apply the update'}
+            <div style={{ fontSize: 11.5, color: 'var(--color-muted-foreground)', lineHeight: 1.6 }}>
+              To apply the update:
+              <br />
+              <strong style={{ color: 'var(--color-foreground)' }}>Quit VetBuddy</strong> (Cmd+Q or close the window) and <strong style={{ color: 'var(--color-foreground)' }}>reopen</strong> it from your Applications folder.
             </div>
           </div>
-          {!restarting && (
-            <button
-              onClick={handleDismiss}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted-foreground)', padding: 4 }}
-              title="Remind me later"
-            >
-              <X size={13} />
-            </button>
-          )}
+          <button
+            onClick={handleDismiss}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted-foreground)', padding: 4, flexShrink: 0 }}
+            title="Dismiss"
+          >
+            <X size={13} />
+          </button>
         </div>
-
-        {!restarting && (
-          <div style={{ padding: '0 12px 12px', display: 'flex', gap: 8 }}>
-            <button
-              onClick={handleInstallNow}
-              style={{
-                flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: 'rgb(22,163,74)', color: 'white',
-                fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              <RotateCcw size={13} />
-              Restart Now
-            </button>
-            <button
-              onClick={handleDismiss}
-              style={{
-                padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', cursor: 'pointer',
-                background: 'transparent', color: 'var(--color-muted-foreground)',
-                fontSize: 12, fontWeight: 600,
-              }}
-            >
-              Later
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // ── Error ────────────────────────────────────────────────────────────────────
-  if (state.phase === 'error') {
-    return (
-      <div style={{
-        margin: '8px 8px 0',
-        borderRadius: 10,
-        background: 'rgba(239,68,68,0.1)',
-        border: '1.5px solid rgba(239,68,68,0.4)',
-        padding: '10px 12px',
-        display: 'flex', alignItems: 'flex-start', gap: 8,
-      }}>
-        <AlertCircle size={14} style={{ color: 'rgb(248,113,113)', flexShrink: 0, marginTop: 1 }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-foreground)', marginBottom: 2 }}>
-            Update check failed
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--color-muted-foreground)', wordBreak: 'break-word' }}>
-            {state.message}
-          </div>
-        </div>
-        <button
-          onClick={handleDismiss}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted-foreground)', padding: 4, flexShrink: 0 }}
-        >
-          <X size={13} />
-        </button>
       </div>
     );
   }
