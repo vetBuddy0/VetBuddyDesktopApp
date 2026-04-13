@@ -42,9 +42,9 @@ export function AboutPanel({ onBack }: Props) {
     });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-background)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, background: "var(--color-background)" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--color-border)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--color-border)", flexShrink: 0 }}>
         <button
           onClick={onBack}
           style={{
@@ -60,7 +60,7 @@ export function AboutPanel({ onBack }: Props) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Version card */}
         <div style={{
           background: "var(--color-card)", border: "1px solid var(--color-border)",
