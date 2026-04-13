@@ -1,6 +1,6 @@
 {
   "name": "vetbuddy-overlay",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "VetBuddy Desktop Overlay - real-time consultation assistant",
   "main": "out/main/index.js",
   "scripts": {
@@ -37,6 +37,7 @@
   "build": {
     "appId": "ai.vetbuddy.overlay",
     "productName": "VetBuddy Overlay",
+    "afterPack": "./scripts/afterPack.cjs",
     "directories": {
       "output": "release"
     },

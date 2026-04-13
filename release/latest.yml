@@ -1,8 +1,8 @@
-version: 1.1.4
+version: 1.1.5
 files:
-  - url: VetBuddy Overlay Setup 1.1.4.exe
-    sha512: pEmXCTOUs7XgZeNcrQkTZ4XMjrFNKZ39Wk+sX+1ALqF3Rfz9YB8yX+qTAN0v1AmCR8Yz7g7VRt3z/DSqONSQIw==
-    size: 89742917
-path: VetBuddy Overlay Setup 1.1.4.exe
-sha512: pEmXCTOUs7XgZeNcrQkTZ4XMjrFNKZ39Wk+sX+1ALqF3Rfz9YB8yX+qTAN0v1AmCR8Yz7g7VRt3z/DSqONSQIw==
-releaseDate: '2026-04-13T12:18:41.033Z'
+  - url: VetBuddy Overlay Setup 1.1.5.exe
+    sha512: h0//zFF/6S4KxpW4QiKJf2q0pWfnBsCOHPAVcMaNvpWGyzLocXUExDChhSqJPISDXHPIp+4VXfq3i9OLQnWk1w==
+    size: 89743603
+path: VetBuddy Overlay Setup 1.1.5.exe
+sha512: h0//zFF/6S4KxpW4QiKJf2q0pWfnBsCOHPAVcMaNvpWGyzLocXUExDChhSqJPISDXHPIp+4VXfq3i9OLQnWk1w==
+releaseDate: '2026-04-13T12:26:40.740Z'
