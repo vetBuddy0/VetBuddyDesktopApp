@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { writeFileSync, unlinkSync, readFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { is } from "@electron-toolkit/utils";
+import { autoUpdater } from "electron-updater";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -180,9 +181,70 @@ ipcMain.on("nav:go", (_, view: string) => {
   mainWindow?.webContents.send("nav:go", view);
 });
 
+// ── Auto-updater IPC ─────────────────────────────────────────────────────────
+ipcMain.handle("updater:check", async () => {
+  if (is.dev) return null;
+  return autoUpdater.checkForUpdates();
+});
+
+ipcMain.handle("updater:download", async () => {
+  if (is.dev) return null;
+  return autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle("updater:install", () => {
+  if (is.dev) return;
+  autoUpdater.quitAndInstall(false, true);
+});
+
+ipcMain.handle("updater:get-version", () => app.getVersion());
+
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createWindow();
+
+  // ── Auto-updater setup (production only) ──────────────────────────────────
+  if (!is.dev) {
+    autoUpdater.autoDownload = false;        // user-triggered download
+    autoUpdater.autoInstallOnAppQuit = true; // install when user quits
+
+    autoUpdater.on("checking-for-update", () => {
+      mainWindow?.webContents.send("updater:status", { type: "checking" });
+    });
+    autoUpdater.on("update-available", (info) => {
+      mainWindow?.webContents.send("updater:status", {
+        type: "available",
+        version: info.version,
+        releaseDate: info.releaseDate,
+      });
+    });
+    autoUpdater.on("update-not-available", () => {
+      mainWindow?.webContents.send("updater:status", { type: "up-to-date" });
+    });
+    autoUpdater.on("download-progress", (p) => {
+      mainWindow?.webContents.send("updater:status", {
+        type: "downloading",
+        percent: Math.round(p.percent),
+        bytesPerSecond: p.bytesPerSecond,
+      });
+    });
+    autoUpdater.on("update-downloaded", (info) => {
+      mainWindow?.webContents.send("updater:status", {
+        type: "downloaded",
+        version: info.version,
+      });
+    });
+    autoUpdater.on("error", (err) => {
+      mainWindow?.webContents.send("updater:status", {
+        type: "error",
+        message: err.message,
+      });
+    });
+
+    // Check on start (3s delay so window is ready) then every 3 hours
+    setTimeout(() => autoUpdater.checkForUpdates().catch(console.error), 3000);
+    setInterval(() => autoUpdater.checkForUpdates().catch(console.error), 3 * 60 * 60 * 1000);
+  }
 
   // Load persisted shortcut
   const config = readConfig();

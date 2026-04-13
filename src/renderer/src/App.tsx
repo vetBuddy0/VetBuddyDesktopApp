@@ -8,6 +8,7 @@ import { SOAPNoteGenerator } from "./components/SOAPNoteGenerator";
 import { TemplateManager } from "./components/TemplateManager";
 import { EzyVetSettings } from "./components/EzyVetSettings";
 import { PasteLab } from "./components/PasteLab";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { logout } from "./authService";
 import { getUIState, setUIState, clearUIState } from "./stateStorage";
 import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings, Zap, LogOut, Pin, Minus, X } from "lucide-react";
@@ -211,6 +212,7 @@ export default function App() {
   return (
     <div id="root">
       <TitleBar />
+      <UpdateBanner />
 
       {/* ── Navigation Tabs ── */}
       {isMainView && (

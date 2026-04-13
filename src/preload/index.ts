@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+export type UpdaterStatus =
+  | { type: "checking" }
+  | { type: "available"; version: string; releaseDate?: string }
+  | { type: "up-to-date" }
+  | { type: "downloading"; percent: number; bytesPerSecond?: number }
+  | { type: "downloaded"; version: string }
+  | { type: "error"; message: string };
+
 contextBridge.exposeInMainWorld("electron", {
   // Window controls
   minimize: () => ipcRenderer.send("window:minimize"),
@@ -30,4 +38,21 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("shortcuts:get"),
   setShowShortcut: (key: string): Promise<{ success: boolean; shortcut: string }> =>
     ipcRenderer.invoke("shortcuts:set-show", key),
+
+  // Auto-updater
+  updater: {
+    check: (): Promise<void> =>
+      ipcRenderer.invoke("updater:check"),
+    download: (): Promise<void> =>
+      ipcRenderer.invoke("updater:download"),
+    install: (): Promise<void> =>
+      ipcRenderer.invoke("updater:install"),
+    getVersion: (): Promise<string> =>
+      ipcRenderer.invoke("updater:get-version"),
+    onStatus: (callback: (status: UpdaterStatus) => void) => {
+      const listener = (_: Electron.IpcRendererEvent, status: UpdaterStatus) => callback(status);
+      ipcRenderer.on("updater:status", listener);
+      return () => ipcRenderer.removeListener("updater:status", listener);
+    },
+  },
 });
