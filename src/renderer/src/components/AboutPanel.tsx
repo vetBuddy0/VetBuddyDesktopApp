@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, CheckCircle, RefreshCw, Search } from "lucide-react";
 
 interface ReleaseEntry {
   version: string;
@@ -22,6 +22,7 @@ export function AboutPanel({ onBack }: Props) {
   const [appVersion, setAppVersion] = useState<string>("...");
   const [releases, setReleases] = useState<ReleasesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     const electron = (window as any).electron;
@@ -78,9 +79,25 @@ export function AboutPanel({ onBack }: Props) {
               v{appVersion}
             </span>
           </div>
-          <div style={{ fontSize: 12, color: "var(--color-muted-foreground)" }}>
+          <div style={{ fontSize: 12, color: "var(--color-muted-foreground)", marginBottom: 10 }}>
             My VetBuddy Desktop Overlay — real-time clinical note assistant for veterinary consultations.
           </div>
+          <button
+            onClick={async () => {
+              setChecking(true);
+              try { await (window as any).electron?.updater?.check?.(); } catch {}
+              setTimeout(() => setChecking(false), 3000);
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 12px", borderRadius: 7, border: "1px solid var(--color-border)",
+              background: "var(--color-background)", color: "var(--color-foreground)",
+              fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            <Search size={12} style={{ animation: checking ? "spin 1s linear infinite" : "none" }} />
+            {checking ? "Checking…" : "Check for Updates"}
+          </button>
         </div>
 
         {/* Patch notes */}

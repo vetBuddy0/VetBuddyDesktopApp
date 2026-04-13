@@ -212,43 +212,49 @@ app.whenReady().then(() => {
   if (!is.dev) {
     autoUpdater.autoDownload = false;        // user-triggered download
     autoUpdater.autoInstallOnAppQuit = true; // install when user quits
+    autoUpdater.logger = null;               // suppress default logger noise
+
+    // Cache last status so we can re-send it when the renderer reloads
+    let lastStatus: object | null = null;
+    const sendStatus = (status: object) => {
+      lastStatus = status;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("updater:status", status);
+      }
+    };
 
     autoUpdater.on("checking-for-update", () => {
-      mainWindow?.webContents.send("updater:status", { type: "checking" });
+      sendStatus({ type: "checking" });
     });
     autoUpdater.on("update-available", (info) => {
-      mainWindow?.webContents.send("updater:status", {
-        type: "available",
-        version: info.version,
-        releaseDate: info.releaseDate,
-      });
+      sendStatus({ type: "available", version: info.version, releaseDate: info.releaseDate });
     });
     autoUpdater.on("update-not-available", () => {
-      mainWindow?.webContents.send("updater:status", { type: "up-to-date" });
+      sendStatus({ type: "up-to-date" });
     });
     autoUpdater.on("download-progress", (p) => {
-      mainWindow?.webContents.send("updater:status", {
-        type: "downloading",
-        percent: Math.round(p.percent),
-        bytesPerSecond: p.bytesPerSecond,
-      });
+      sendStatus({ type: "downloading", percent: Math.round(p.percent), bytesPerSecond: p.bytesPerSecond });
     });
     autoUpdater.on("update-downloaded", (info) => {
-      mainWindow?.webContents.send("updater:status", {
-        type: "downloaded",
-        version: info.version,
-      });
+      sendStatus({ type: "downloaded", version: info.version });
     });
     autoUpdater.on("error", (err) => {
-      mainWindow?.webContents.send("updater:status", {
-        type: "error",
-        message: err.message,
-      });
+      console.error("[updater] error:", err.message);
+      sendStatus({ type: "error", message: err.message });
     });
 
-    // Check on start (3s delay so window is ready) then every 3 hours
-    setTimeout(() => autoUpdater.checkForUpdates().catch(console.error), 3000);
-    setInterval(() => autoUpdater.checkForUpdates().catch(console.error), 3 * 60 * 60 * 1000);
+    // Trigger check once the renderer has fully loaded (so the listener is ready)
+    // then re-check every 3 hours
+    const runCheck = () => autoUpdater.checkForUpdates().catch(console.error);
+    mainWindow!.webContents.on("did-finish-load", () => {
+      // Re-send cached status (e.g. after a reload) so the banner reappears
+      if (lastStatus) {
+        mainWindow?.webContents.send("updater:status", lastStatus);
+      }
+      // First-run check — small delay so React has time to mount & subscribe
+      setTimeout(runCheck, 1000);
+    });
+    setInterval(runCheck, 3 * 60 * 60 * 1000);
   }
 
   // Load persisted shortcut

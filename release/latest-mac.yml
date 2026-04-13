@@ -1,8 +1,8 @@
-version: 1.1.1
+version: 1.1.2
 files:
-  - url: VetBuddy Overlay-1.1.1-arm64.dmg
-    sha512: xCxosXTZRP6gHdOMgNTU+mLipBvtdgo8nD8T9cBDwKD3mhI+rq23Uo3kRaytGbURzm2K7OSWy8pMERj3fHlFjg==
-    size: 101794419
-path: VetBuddy Overlay-1.1.1-arm64.dmg
-sha512: xCxosXTZRP6gHdOMgNTU+mLipBvtdgo8nD8T9cBDwKD3mhI+rq23Uo3kRaytGbURzm2K7OSWy8pMERj3fHlFjg==
-releaseDate: '2026-04-13T11:54:24.161Z'
+  - url: VetBuddy Overlay-1.1.2-arm64.dmg
+    sha512: Gv2WBaW8dLwwZs2v+k3E+5mDf2fUZznqDZJUTS8A6SOgCBogJdvIBU+Gcn3tzh6+7T6Nrt5g/ArxTQ93k7NHCw==
+    size: 101787258
+path: VetBuddy Overlay-1.1.2-arm64.dmg
+sha512: Gv2WBaW8dLwwZs2v+k3E+5mDf2fUZznqDZJUTS8A6SOgCBogJdvIBU+Gcn3tzh6+7T6Nrt5g/ArxTQ93k7NHCw==
+releaseDate: '2026-04-13T12:03:20.593Z'
