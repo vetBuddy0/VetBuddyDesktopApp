@@ -1,24 +1,15 @@
 /**
- * afterPack hook — strips the ad-hoc code signature from the macOS app bundle
- * before electron-builder zips it for auto-updates.
+ * afterPack hook — intentionally a no-op.
  *
- * Without this, Squirrel.Mac (ShipIt) rejects the update because the app has
- * an invalid partial signature (no Developer ID cert) that fails validation.
- * Stripping it entirely lets ShipIt install unsigned apps without complaint.
+ * We previously stripped the ad-hoc signature here so Squirrel.Mac (ShipIt)
+ * would not reject the update. However, completely removing the signature
+ * causes macOS to refuse to open the app at all ("can't be opened").
+ *
+ * Since v1.1.6 we bypass Squirrel entirely with a custom shell-script
+ * installer on macOS, so we no longer need to strip the signature.
+ * The ad-hoc signature applied by electron-builder is sufficient for
+ * the app to run (users right-click → Open on first launch to pass Gatekeeper).
  */
-const { execSync } = require("child_process");
-const path = require("path");
-
-exports.default = async function afterPack(context) {
-  if (context.packager.platform.name !== "mac") return;
-
-  const appName = context.packager.appInfo.productFilename;
-  const appPath = path.join(context.appOutDir, `${appName}.app`);
-
-  try {
-    execSync(`codesign --remove-signature "${appPath}"`, { stdio: "pipe" });
-    console.log(`  • stripped code signature from ${appName}.app`);
-  } catch {
-    // No signature present — nothing to strip, that's fine
-  }
+exports.default = async function afterPack(_context) {
+  // no-op
 };
