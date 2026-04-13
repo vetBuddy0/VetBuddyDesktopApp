@@ -38,7 +38,7 @@ function registerShowShortcut(key: string): boolean {
     try { globalShortcut.unregister(currentShowShortcut); } catch { /* ignore */ }
   }
   const ok = globalShortcut.register(key, () => {
-    if (!mainWindow) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isVisible() && mainWindow.isFocused()) {
       mainWindow.hide();
     } else {
@@ -81,6 +81,9 @@ function createWindow(): void {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   mainWindow.on("ready-to-show", () => mainWindow?.show());
+
+  // Clear the reference when the window is destroyed so shortcuts don't crash
+  mainWindow.on("closed", () => { mainWindow = null; });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -178,7 +181,9 @@ ipcMain.handle("clipboard:write", async (_, text: string) => {
 
 // ── Nav relay (global shortcut → renderer) ───────────────────────────────────
 ipcMain.on("nav:go", (_, view: string) => {
-  mainWindow?.webContents.send("nav:go", view);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("nav:go", view);
+  }
 });
 
 // ── Auto-updater IPC ─────────────────────────────────────────────────────────
@@ -257,7 +262,7 @@ app.whenReady().then(() => {
 
   // Minimise / restore
   globalShortcut.register("CommandOrControl+Shift+M", () => {
-    if (!mainWindow) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
     else mainWindow.minimize();
   });
@@ -272,7 +277,7 @@ app.whenReady().then(() => {
   ];
   for (const [key, view] of tabKeys) {
     globalShortcut.register(key, () => {
-      if (!mainWindow) return;
+      if (!mainWindow || mainWindow.isDestroyed()) return;
       if (!mainWindow.isVisible()) { mainWindow.show(); mainWindow.focus(); }
       mainWindow.webContents.send("nav:go", view);
     });

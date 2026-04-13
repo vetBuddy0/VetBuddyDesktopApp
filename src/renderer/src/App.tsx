@@ -9,9 +9,10 @@ import { TemplateManager } from "./components/TemplateManager";
 import { EzyVetSettings } from "./components/EzyVetSettings";
 import { PasteLab } from "./components/PasteLab";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { AboutPanel } from "./components/AboutPanel";
 import { logout } from "./authService";
 import { getUIState, setUIState, clearUIState } from "./stateStorage";
-import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings, Zap, LogOut, Pin, Minus, X } from "lucide-react";
+import { Stethoscope, Users2, Clock10, FileText, FileEdit, Settings, Zap, LogOut, Pin, Minus, X, Info } from "lucide-react";
 import type { EzyVetPrefillData } from "./types/patient";
 
 type View =
@@ -23,7 +24,8 @@ type View =
   | "notes"
   | "templates"
   | "paste-lab"
-  | "ezyvet-settings";
+  | "ezyvet-settings"
+  | "about";
 
 export default function App() {
   const [pinned, setPinned] = useState(true);
@@ -145,6 +147,16 @@ export default function App() {
             title="Window opacity"
           />
         </div>
+
+        {!minimal && (
+          <button
+            onClick={() => setCurrentView("about")}
+            className="ctrl-btn"
+            title="About / Version Info"
+          >
+            <Info size={13} />
+          </button>
+        )}
 
         {!minimal && (
           <button
@@ -314,6 +326,10 @@ export default function App() {
 
         {currentView === "ezyvet-settings" && (
           <EzyVetSettings onBack={() => setCurrentView("patients")} />
+        )}
+
+        {currentView === "about" && (
+          <AboutPanel onBack={() => setCurrentView("patients")} />
         )}
       </div>
     </div>

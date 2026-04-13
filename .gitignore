@@ -4,3 +4,11 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Build outputs — large binaries go to GitHub Releases, not git
+release/mac-arm64/
+release/win-arm64-unpacked/
+release/__uninstaller-*
+release/*.dmg
+release/*.exe
+release/*.blockmap
