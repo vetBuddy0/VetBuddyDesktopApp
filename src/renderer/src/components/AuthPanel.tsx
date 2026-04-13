@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { login, signup } from '../authService'
-import { Stethoscope, Mail, Lock, User as UserIcon } from 'lucide-react'
+import { Stethoscope, Mail, Lock, User as UserIcon, Eye, EyeOff } from 'lucide-react'
 
 interface AuthPanelProps {
   onLoginSuccess?: () => void
@@ -16,6 +16,7 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSignIn = async () => {
     if (!email || !password) { setError('Please enter email and password'); return }
@@ -146,16 +147,29 @@ export const AuthPanel: React.FC<AuthPanelProps> = ({ onLoginSuccess }) => {
             />
           </div>
 
-          <div className="input-icon-wrapper">
+          <div className="input-icon-wrapper" style={{ position: 'relative' }}>
             <Lock size={14} className="input-icon" />
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               disabled={loading}
               className="input"
+              style={{ paddingRight: 32 }}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                color: 'var(--color-muted-foreground)', display: 'flex', alignItems: 'center',
+              }}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
           </div>
 
           <button
