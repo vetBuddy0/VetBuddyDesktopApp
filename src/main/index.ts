@@ -1,12 +1,13 @@
 import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut } from "electron";
 import { join } from "path";
 import { exec } from "child_process";
-import { writeFileSync, unlinkSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, unlinkSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { is } from "@electron-toolkit/utils";
 import { autoUpdater } from "electron-updater";
 
 let mainWindow: BrowserWindow | null = null;
+let downloadedFilePath: string | null = null;
 
 // ── Config (stored in userData so it survives app updates) ───────────────────
 const CONFIG_PATH = join(app.getPath("userData"), "vetbuddy-config.json");
@@ -197,9 +198,36 @@ ipcMain.handle("updater:download", async () => {
   return autoUpdater.downloadUpdate();
 });
 
-ipcMain.handle("updater:install", () => {
+ipcMain.handle("updater:install", async () => {
   if (is.dev) return;
-  autoUpdater.quitAndInstall(false, true);
+  if (process.platform === "darwin" && downloadedFilePath) {
+    // Bypass Squirrel.Mac entirely — it corrupts unsigned app installs.
+    // Instead: run a detached shell script that waits for us to quit,
+    // then extracts the ZIP and replaces the .app bundle, then relaunches.
+    const exePath = app.getPath("exe");
+    const appPath = exePath.split(".app/")[0] + ".app";
+    const appDir = require("path").dirname(appPath);
+    const tmpExtract = join(tmpdir(), `vb-update-${Date.now()}`);
+    const script = [
+      `#!/bin/bash`,
+      `sleep 2`,
+      `unzip -o "${downloadedFilePath}" -d "${tmpExtract}"`,
+      `NEW=$(find "${tmpExtract}" -maxdepth 1 -name "*.app" | head -1)`,
+      `if [ -n "$NEW" ]; then`,
+      `  rm -rf "${appPath}"`,
+      `  cp -Rp "$NEW" "${appDir}/"`,
+      `  open "${appPath}"`,
+      `fi`,
+      `rm -rf "${tmpExtract}"`,
+    ].join("\n");
+    const scriptPath = join(tmpdir(), "vb-updater.sh");
+    writeFileSync(scriptPath, script, "utf8");
+    exec(`chmod +x "${scriptPath}" && bash "${scriptPath}" &`);
+    app.quit();
+  } else {
+    // Windows: NSIS handles installs correctly
+    autoUpdater.quitAndInstall(false, true);
+  }
 });
 
 ipcMain.handle("updater:get-version", () => app.getVersion());
@@ -235,7 +263,8 @@ app.whenReady().then(() => {
     autoUpdater.on("download-progress", (p) => {
       sendStatus({ type: "downloading", percent: Math.round(p.percent), bytesPerSecond: p.bytesPerSecond });
     });
-    autoUpdater.on("update-downloaded", (info) => {
+    autoUpdater.on("update-downloaded", (info: any) => {
+      downloadedFilePath = info.downloadedFile ?? null;
       sendStatus({ type: "downloaded", version: info.version });
     });
     autoUpdater.on("error", (err) => {
