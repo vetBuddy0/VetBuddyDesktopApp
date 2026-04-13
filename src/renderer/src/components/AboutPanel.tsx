@@ -29,7 +29,7 @@ export function AboutPanel({ onBack }: Props) {
     if (electron?.updater?.getVersion) {
       electron.updater.getVersion().then((v: string) => setAppVersion(v)).catch(() => {});
     }
-    fetch(RELEASES_URL)
+    fetch(`${RELEASES_URL}?t=${Date.now()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data: ReleasesData) => setReleases(data))
       .catch(() => {})
@@ -166,7 +166,7 @@ export function AboutPanel({ onBack }: Props) {
       )}
 
       <div style={{ fontSize: 11, color: "var(--color-muted-foreground)", textAlign: "center", paddingTop: 4 }}>
-        © 2025 VetBuddy · Built for veterinary professionals
+        © 2026 VetBuddy · Built for veterinary professionals
       </div>
     </div>
   );

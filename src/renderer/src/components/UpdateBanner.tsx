@@ -32,7 +32,7 @@ export function UpdateBanner() {
         setState({ phase: 'available', version: status.version });
         setDismissed(false);
         setShowNotes(false);
-        fetch(RELEASES_URL)
+        fetch(`${RELEASES_URL}?t=${Date.now()}`, { cache: "no-store" })
           .then(r => r.json())
           .then(data => setReleaseNote({ version: data.latest.version, notes: data.latest.notes }))
           .catch(() => {});
