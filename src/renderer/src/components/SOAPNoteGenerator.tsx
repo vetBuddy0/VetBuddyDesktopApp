@@ -255,6 +255,11 @@ export function SOAPNoteGenerator({
   // Display format preference
   const [formatPreference, setFormatPreference] = useState<"bullet" | "paragraph">("bullet");
 
+  // Copy-section-by-section state
+  const [stepCopyMode, setStepCopyMode] = useState(false);
+  const [stepCopyIndex, setStepCopyIndex] = useState(0);
+  const [stepCopied, setStepCopied] = useState(false);
+
 
   // Load active consultations and templates on mount
   useEffect(() => {
@@ -779,6 +784,45 @@ export function SOAPNoteGenerator({
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
+  // ── Copy section-by-section helpers ─────────────────────────────────────────
+  const getFlatSections = (): Array<{ title: string; text: string }> => {
+    if (!clinicalNote?.noteContent?.sections) return [];
+    const result: Array<{ title: string; text: string }> = [];
+    const walk = (s: ClinicalNoteSection) => {
+      result.push({ title: s.title, text: s.content || 'Not specified' });
+      s.subsections?.forEach(walk);
+    };
+    clinicalNote.noteContent.sections.forEach(walk);
+    if (clinicalNote.clientSummary) {
+      result.push({ title: 'Client Summary', text: clinicalNote.clientSummary });
+    }
+    return result;
+  };
+
+  const startStepCopy = () => {
+    const sections = getFlatSections();
+    if (!sections.length) return;
+    setStepCopyMode(true);
+    setStepCopyIndex(0);
+    setStepCopied(false);
+    navigator.clipboard.writeText(sections[0].text).catch(() => {});
+    setStepCopied(true);
+  };
+
+  const stepCopyNext = () => {
+    const sections = getFlatSections();
+    const next = stepCopyIndex + 1;
+    if (next >= sections.length) {
+      setStepCopyMode(false);
+      setSuccess(`All ${sections.length} sections copied`);
+      return;
+    }
+    setStepCopyIndex(next);
+    setStepCopied(false);
+    navigator.clipboard.writeText(sections[next].text).catch(() => {});
+    setStepCopied(true);
+  };
+
   const handleEditField = (field: keyof SOAPNote, value: string) => {
     setEditedSOAP((prev) => ({ ...prev, [field]: value }));
   };
@@ -1011,10 +1055,103 @@ export function SOAPNoteGenerator({
 
           {/* Copy Actions */}
           <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <button onClick={handleCopyToClipboard} disabled={pasting} className="btn btn-primary" style={{ width: '100%' }}>
-              {pasting ? <><Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} />Copying...</> : <><Copy size={13} />Copy Note to Clipboard</>}
-            </button>
-            <p style={{ fontSize: 11, textAlign: 'center', color: 'var(--color-muted-foreground)' }}>Copy the note then paste it into your EHR</p>
+
+            {/* Step-by-step copy mode */}
+            {stepCopyMode ? (() => {
+              const sections = getFlatSections();
+              const current = sections[stepCopyIndex];
+              const isLast = stepCopyIndex === sections.length - 1;
+              return (
+                <div style={{
+                  border: '1.5px solid var(--color-primary)',
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: 'rgba(var(--primary-rgb, 99,102,241),0.06)',
+                }}>
+                  {/* Progress bar */}
+                  <div style={{ height: 3, background: 'var(--color-muted)' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${((stepCopyIndex + 1) / sections.length) * 100}%`,
+                      background: 'var(--color-primary)',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                  <div style={{ padding: '10px 13px' }}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+                          background: 'var(--color-primary)', color: 'white',
+                          padding: '2px 7px', borderRadius: 5,
+                        }}>
+                          {stepCopyIndex + 1} / {sections.length}
+                        </span>
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-foreground)' }}>
+                          {current.title}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setStepCopyMode(false)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted-foreground)', padding: 2 }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                    {/* Content preview */}
+                    <div style={{
+                      fontSize: 11.5, color: 'var(--color-muted-foreground)', lineHeight: 1.5,
+                      maxHeight: 60, overflow: 'hidden',
+                      display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+                      marginBottom: 10,
+                    }}>
+                      {current.text}
+                    </div>
+                    {/* Copied badge + Next button */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        fontSize: 11.5, fontWeight: 600, color: 'rgb(34,197,94)',
+                      }}>
+                        <Check size={13} />
+                        Copied — paste it now
+                      </div>
+                      <button
+                        onClick={stepCopyNext}
+                        style={{
+                          marginLeft: 'auto',
+                          padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                          background: 'var(--color-primary)', color: 'white',
+                          fontSize: 12, fontWeight: 700,
+                        }}
+                      >
+                        {isLast ? 'Done ✓' : 'Next →'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={handleCopyToClipboard} disabled={pasting} className="btn btn-secondary" style={{ flex: 1 }}>
+                  {pasting ? <><Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite' }} />Copying...</> : <><Copy size={13} />Copy All</>}
+                </button>
+                <button
+                  onClick={startStepCopy}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  title="Copy each section separately, one by one"
+                >
+                  <Copy size={13} />
+                  Copy Separately
+                </button>
+              </div>
+            )}
+
+            <p style={{ fontSize: 11, textAlign: 'center', color: 'var(--color-muted-foreground)' }}>
+              {stepCopyMode ? 'Paste each field into your EHR, then click Next' : '"Copy Separately" copies one section at a time — paste each into its own field'}
+            </p>
           </div>
         </div>
       )}

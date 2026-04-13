@@ -192,7 +192,7 @@ ipcMain.on("nav:go", (_, view: string) => {
 // ── Auto-updater IPC ─────────────────────────────────────────────────────────
 ipcMain.handle("updater:check", async () => {
   if (is.dev) return null;
-  return autoUpdater.checkForUpdates();
+  try { return await autoUpdater.checkForUpdates(); } catch { return null; }
 });
 
 ipcMain.handle("updater:download", async () => {
@@ -277,7 +277,9 @@ app.whenReady().then(() => {
 
     // Trigger check once the renderer has fully loaded (so the listener is ready)
     // then re-check every 3 hours
-    const runCheck = () => autoUpdater.checkForUpdates().catch(console.error);
+    const runCheck = () => {
+      try { autoUpdater.checkForUpdates().catch(() => {}); } catch { /* ignore */ }
+    };
     mainWindow!.webContents.on("did-finish-load", () => {
       // Re-send cached status (e.g. after a reload) so the banner reappears
       if (lastStatus) {
