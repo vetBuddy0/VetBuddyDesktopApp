@@ -1,8 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut, safeStorage, clipboard } from "electron";
 import { flipFuses, FuseVersion, FuseV1Options } from "@electron/fuses";
 import { join } from "path";
 import { spawn } from "child_process";
-import { promises as fs, existsSync } from "fs";
+import { promises as fs } from "fs";
 import { tmpdir } from "os";
 import { is } from "@electron-toolkit/utils";
 import { autoUpdater } from "electron-updater";
@@ -17,11 +17,10 @@ const DEFAULT_SHOW_SHORTCUT = "CommandOrControl+Shift+V"; // default: Cmd+Shift+
 
 async function readConfig(): Promise<{ showShortcut: string }> {
   try {
-    if (existsSync(CONFIG_PATH)) {
-      const data = await fs.readFile(CONFIG_PATH, "utf8");
-      return JSON.parse(data);
-    }
-  } catch { /* ignore parse errors */ }
+    await fs.access(CONFIG_PATH);
+    const data = await fs.readFile(CONFIG_PATH, "utf8");
+    return JSON.parse(data);
+  } catch { /* ignore accessible or parse errors */ }
   return { showShortcut: DEFAULT_SHOW_SHORTCUT };
 }
 
@@ -31,6 +30,17 @@ async function writeConfig(config: { showShortcut: string }) {
   } catch (e) {
     console.error("Failed to write config:", e);
   }
+}
+
+/**
+ * Ensures IPC messages only originate from our local application files.
+ */
+function validateSender(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): boolean {
+  if (!event.senderFrame) return false;
+  if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
+    return event.senderFrame.url.startsWith(process.env["ELECTRON_RENDERER_URL"]);
+  }
+  return event.senderFrame.url.startsWith("file://");
 }
 
 // ── Show/hide shortcut — re-registerable ─────────────────────────────────────
@@ -109,11 +119,18 @@ function createWindow(): void {
 }
 
 // ── Window control IPC ───────────────────────────────────────────────────────
-ipcMain.on("window:minimize", () => mainWindow?.minimize());
-ipcMain.on("window:close", () => mainWindow?.close());
+ipcMain.on("window:minimize", (event) => {
+  if (!validateSender(event)) return;
+  mainWindow?.minimize();
+});
+ipcMain.on("window:close", (event) => {
+  if (!validateSender(event)) return;
+  mainWindow?.close();
+});
 
 const TogglePinSchema = z.boolean();
-ipcMain.on("window:toggle-pin", (_, pinned: unknown) => {
+ipcMain.on("window:toggle-pin", (event, pinned: unknown) => {
+  if (!validateSender(event)) return;
   const result = TogglePinSchema.safeParse(pinned);
   if (result.success) {
     mainWindow?.setAlwaysOnTop(result.data, "floating");
@@ -121,7 +138,8 @@ ipcMain.on("window:toggle-pin", (_, pinned: unknown) => {
 });
 
 const SetOpacitySchema = z.number().min(0.1).max(1);
-ipcMain.on("window:set-opacity", (_, value: unknown) => {
+ipcMain.on("window:set-opacity", (event, value: unknown) => {
+  if (!validateSender(event)) return;
   const result = SetOpacitySchema.safeParse(value);
   if (result.success) {
     mainWindow?.setOpacity(result.data);
@@ -129,12 +147,14 @@ ipcMain.on("window:set-opacity", (_, value: unknown) => {
 });
 
 // ── Shortcut config IPC ──────────────────────────────────────────────────────
-ipcMain.handle("shortcuts:get", () => {
+ipcMain.handle("shortcuts:get", (event) => {
+  if (!validateSender(event)) return null;
   return { showShortcut: currentShowShortcut };
 });
 
 const SetShowShortcutSchema = z.string().min(1).max(50);
-ipcMain.handle("shortcuts:set-show", (_, key: unknown) => {
+ipcMain.handle("shortcuts:set-show", (event, key: unknown) => {
+  if (!validateSender(event)) return { success: false, shortcut: currentShowShortcut };
   const result = SetShowShortcutSchema.safeParse(key);
   if (!result.success) return { success: false, shortcut: currentShowShortcut };
 
@@ -146,7 +166,8 @@ ipcMain.handle("shortcuts:set-show", (_, key: unknown) => {
 });
 
 // ── Screen capture ───────────────────────────────────────────────────────────
-ipcMain.handle("screen:capture", async () => {
+ipcMain.handle("screen:capture", async (event) => {
+  if (!validateSender(event)) return null;
   try {
     const sources = await desktopCapturer.getSources({
       types: ["screen"],
@@ -166,7 +187,8 @@ const PasteAtSchema = z.object({
   y: z.number().int().min(0).max(10000),
 });
 
-ipcMain.handle("screen:paste-at", async (_, payload: unknown) => {
+ipcMain.handle("screen:paste-at", async (event, payload: unknown) => {
+  if (!validateSender(event)) return { success: false, error: "Access denied" };
   if (process.platform !== "darwin") {
     return { success: false, error: "Auto-paste only supported on macOS currently." };
   }
@@ -204,29 +226,19 @@ ipcMain.handle("screen:paste-at", async (_, payload: unknown) => {
   });
 });
 
-// ── Clipboard write via pbcopy ───────────────────────────────────────────────
+// ── Clipboard write ──────────────────────────────────────────────────────────
 const ClipboardWriteSchema = z.string().max(1000000); // 1MB limit for safety
-ipcMain.handle("clipboard:write", async (_, text: unknown) => {
-  if (process.platform !== "darwin") return { success: false };
+ipcMain.handle("clipboard:write", async (event, text: unknown) => {
+  if (!validateSender(event)) return { success: false, error: "Access denied" };
 
   const result = ClipboardWriteSchema.safeParse(text);
   if (!result.success) return { success: false, error: "Invalid text payload" };
 
-  const tmp = join(tmpdir(), `vb_${Date.now()}.txt`);
   try {
-    await fs.writeFile(tmp, result.data, "utf8");
-    return new Promise((resolve) => {
-      const child = spawn("bash", ["-c", `cat "${tmp}" | pbcopy`]);
-      child.on("close", async (code) => {
-        try { await fs.unlink(tmp); } catch { /* ignore */ }
-        resolve({ success: code === 0 });
-      });
-      child.on("error", async (err) => {
-        try { await fs.unlink(tmp); } catch { /* ignore */ }
-        resolve({ success: false, error: err.message });
-      });
-    });
+    clipboard.writeText(result.data);
+    return { success: true };
   } catch (err: any) {
+    console.error("clipboard:write failed:", err.message);
     return { success: false, error: err.message };
   }
 });
@@ -239,17 +251,20 @@ ipcMain.on("nav:go", (_, view: string) => {
 });
 
 // ── Auto-updater IPC ─────────────────────────────────────────────────────────
-ipcMain.handle("updater:check", async () => {
+ipcMain.handle("updater:check", async (event) => {
+  if (!validateSender(event)) return null;
   if (is.dev) return null;
   try { return await autoUpdater.checkForUpdates(); } catch { return null; }
 });
 
-ipcMain.handle("updater:download", async () => {
+ipcMain.handle("updater:download", async (event) => {
+  if (!validateSender(event)) return null;
   if (is.dev) return null;
   return autoUpdater.downloadUpdate();
 });
 
-ipcMain.handle("updater:install", async () => {
+ipcMain.handle("updater:install", async (event) => {
+  if (!validateSender(event)) return;
   if (is.dev) return;
   if (process.platform === "darwin" && downloadedFilePath) {
     // Bypass Squirrel.Mac entirely — it corrupts unsigned app installs.
@@ -290,20 +305,27 @@ ipcMain.handle("updater:install", async () => {
   }
 });
 
-ipcMain.handle("updater:get-version", () => app.getVersion());
+ipcMain.handle("updater:get-version", (event) => {
+  if (!validateSender(event)) return "";
+  return app.getVersion();
+});
 
 // ── Secure Storage IPC ───────────────────────────────────────────────────────
 const SECURE_STORAGE_DIR = join(app.getPath("userData"), "secure-storage");
-if (!existsSync(SECURE_STORAGE_DIR)) {
-  require("fs").mkdirSync(SECURE_STORAGE_DIR, { recursive: true });
+async function ensureDir(dir: string) {
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch { /* ignore */ }
 }
+ensureDir(SECURE_STORAGE_DIR);
 
 const SecureStorageSchema = z.object({
   key: z.string().regex(/^[a-z0-9_-]+$/),
   value: z.string().optional(),
 });
 
-ipcMain.handle("secure-storage:set", async (_, payload: unknown) => {
+ipcMain.handle("secure-storage:set", async (event, payload: unknown) => {
+  if (!validateSender(event)) return { success: false };
   const result = SecureStorageSchema.safeParse(payload);
   if (!result.success || !result.data.value) return { success: false };
 
@@ -318,13 +340,18 @@ ipcMain.handle("secure-storage:set", async (_, payload: unknown) => {
   }
 });
 
-ipcMain.handle("secure-storage:get", async (_, payload: unknown) => {
+ipcMain.handle("secure-storage:get", async (event, payload: unknown) => {
+  if (!validateSender(event)) return null;
   const result = SecureStorageSchema.safeParse(payload);
   if (!result.success) return null;
 
   try {
     const filePath = join(SECURE_STORAGE_DIR, result.data.key);
-    if (!existsSync(filePath)) return null;
+    try {
+      await fs.access(filePath);
+    } catch {
+      return null;
+    }
 
     const encrypted = await fs.readFile(filePath);
     if (!safeStorage.isEncryptionAvailable()) return null;
@@ -336,14 +363,18 @@ ipcMain.handle("secure-storage:get", async (_, payload: unknown) => {
   }
 });
 
-ipcMain.handle("secure-storage:remove", async (_, payload: unknown) => {
+ipcMain.handle("secure-storage:remove", async (event, payload: unknown) => {
+  if (!validateSender(event)) return { success: false };
   const result = SecureStorageSchema.omit({ value: true }).safeParse(payload);
   if (!result.success) return { success: false };
 
   try {
     const filePath = join(SECURE_STORAGE_DIR, result.data.key);
-    if (existsSync(filePath)) {
+    try {
+      await fs.access(filePath);
       await fs.unlink(filePath);
+    } catch {
+      // already gone/not found
     }
     return { success: true };
   } catch {
