@@ -55,4 +55,14 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("updater:status", listener);
     },
   },
+
+  // Secure Storage
+  secureStorage: {
+    get: (key: string): Promise<string | null> =>
+      ipcRenderer.invoke("secure-storage:get", { key }),
+    set: (key: string, value: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("secure-storage:set", { key, value }),
+    remove: (key: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("secure-storage:remove", { key }),
+  },
 });

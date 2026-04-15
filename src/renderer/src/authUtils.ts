@@ -6,26 +6,65 @@ export function isUnauthorizedError(error: Error): boolean {
 }
 
 export async function getAuthToken(): Promise<string | null> {
-  return localStorage.getItem('vetbuddy_token');
+  const electron = (window as any).electron;
+  if (!electron?.secureStorage) {
+    return localStorage.getItem('vetbuddy_token');
+  }
+
+  let token = await electron.secureStorage.get('token');
+  if (!token) {
+    // Migration: Check localStorage
+    token = localStorage.getItem('vetbuddy_token');
+    if (token) {
+      await electron.secureStorage.set('token', token);
+      localStorage.removeItem('vetbuddy_token');
+    }
+  }
+  return token;
 }
 
 export async function setAuthToken(token: string): Promise<void> {
-  localStorage.setItem('vetbuddy_token', token);
+  const electron = (window as any).electron;
+  if (electron?.secureStorage) {
+    await electron.secureStorage.set('token', token);
+    localStorage.removeItem('vetbuddy_token');
+  } else {
+    localStorage.setItem('vetbuddy_token', token);
+  }
 }
 
 export async function removeAuthToken(): Promise<void> {
+  const electron = (window as any).electron;
+  if (electron?.secureStorage) {
+    await electron.secureStorage.remove('token');
+    await electron.secureStorage.remove('user');
+  }
   localStorage.removeItem('vetbuddy_token');
   localStorage.removeItem('vetbuddy_user');
 }
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const token = localStorage.getItem('vetbuddy_token');
+  const token = await getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export async function getUserData(): Promise<any | null> {
+  const electron = (window as any).electron;
   try {
-    const raw = localStorage.getItem('vetbuddy_user');
+    if (!electron?.secureStorage) {
+      const raw = localStorage.getItem('vetbuddy_user');
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    let raw = await electron.secureStorage.get('user');
+    if (!raw) {
+      // Migration
+      raw = localStorage.getItem('vetbuddy_user');
+      if (raw) {
+        await electron.secureStorage.set('user', raw);
+        localStorage.removeItem('vetbuddy_user');
+      }
+    }
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -33,7 +72,14 @@ export async function getUserData(): Promise<any | null> {
 }
 
 export async function setUserData(user: any): Promise<void> {
-  localStorage.setItem('vetbuddy_user', JSON.stringify(user));
+  const electron = (window as any).electron;
+  const raw = JSON.stringify(user);
+  if (electron?.secureStorage) {
+    await electron.secureStorage.set('user', raw);
+    localStorage.removeItem('vetbuddy_user');
+  } else {
+    localStorage.setItem('vetbuddy_user', raw);
+  }
 }
 
 export async function removeUserData(): Promise<void> {

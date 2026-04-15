@@ -12,11 +12,13 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
+    "@electron/fuses": "^2.1.1",
     "axios": "^1.7.0",
     "electron-updater": "^6.8.3",
     "lucide-react": "^1.7.0",
     "react-audio-visualize": "^1.2.0",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",
@@ -41,12 +43,18 @@
     "directories": {
       "output": "release"
     },
+    "asar": {
+      "integrity": true
+    },
     "publish": {
       "provider": "generic",
       "url": "https://vetbuddy-385b2.web.app/updates"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.medical",
       "icon": "build/icon.icns"
     },

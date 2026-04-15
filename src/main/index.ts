@@ -1,10 +1,12 @@
-import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut } from "electron";
+import { app, BrowserWindow, ipcMain, shell, desktopCapturer, globalShortcut, safeStorage } from "electron";
+import { flipFuses, FuseVersion, FuseV1Options } from "@electron/fuses";
 import { join } from "path";
-import { exec } from "child_process";
-import { writeFileSync, unlinkSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { spawn } from "child_process";
+import { promises as fs, existsSync } from "fs";
 import { tmpdir } from "os";
 import { is } from "@electron-toolkit/utils";
 import { autoUpdater } from "electron-updater";
+import { z } from "zod";
 
 let mainWindow: BrowserWindow | null = null;
 let downloadedFilePath: string | null = null;
@@ -13,18 +15,19 @@ let downloadedFilePath: string | null = null;
 const CONFIG_PATH = join(app.getPath("userData"), "vetbuddy-config.json");
 const DEFAULT_SHOW_SHORTCUT = "CommandOrControl+Shift+V"; // default: Cmd+Shift+V
 
-function readConfig(): { showShortcut: string } {
+async function readConfig(): Promise<{ showShortcut: string }> {
   try {
     if (existsSync(CONFIG_PATH)) {
-      return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+      const data = await fs.readFile(CONFIG_PATH, "utf8");
+      return JSON.parse(data);
     }
   } catch { /* ignore parse errors */ }
   return { showShortcut: DEFAULT_SHOW_SHORTCUT };
 }
 
-function writeConfig(config: { showShortcut: string }) {
+async function writeConfig(config: { showShortcut: string }) {
   try {
-    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+    await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
   } catch (e) {
     console.error("Failed to write config:", e);
   }
@@ -74,7 +77,7 @@ function createWindow(): void {
     visualEffectState: "active",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
-      sandbox: false,
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -89,7 +92,12 @@ function createWindow(): void {
   mainWindow.on("closed", () => { mainWindow = null; });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    // Only allow opening https URLs
+    if (url.startsWith("https://")) {
+      shell.openExternal(url);
+    } else {
+      console.warn("Blocked potentially unsafe external URL:", url);
+    }
     return { action: "deny" };
   });
 
@@ -103,11 +111,21 @@ function createWindow(): void {
 // ── Window control IPC ───────────────────────────────────────────────────────
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
 ipcMain.on("window:close", () => mainWindow?.close());
-ipcMain.on("window:toggle-pin", (_, pinned: boolean) => {
-  mainWindow?.setAlwaysOnTop(pinned, "floating");
+
+const TogglePinSchema = z.boolean();
+ipcMain.on("window:toggle-pin", (_, pinned: unknown) => {
+  const result = TogglePinSchema.safeParse(pinned);
+  if (result.success) {
+    mainWindow?.setAlwaysOnTop(result.data, "floating");
+  }
 });
-ipcMain.on("window:set-opacity", (_, value: number) => {
-  mainWindow?.setOpacity(value);
+
+const SetOpacitySchema = z.number().min(0.1).max(1);
+ipcMain.on("window:set-opacity", (_, value: unknown) => {
+  const result = SetOpacitySchema.safeParse(value);
+  if (result.success) {
+    mainWindow?.setOpacity(result.data);
+  }
 });
 
 // ── Shortcut config IPC ──────────────────────────────────────────────────────
@@ -115,10 +133,14 @@ ipcMain.handle("shortcuts:get", () => {
   return { showShortcut: currentShowShortcut };
 });
 
-ipcMain.handle("shortcuts:set-show", (_, key: string) => {
-  const ok = registerShowShortcut(key);
+const SetShowShortcutSchema = z.string().min(1).max(50);
+ipcMain.handle("shortcuts:set-show", (_, key: unknown) => {
+  const result = SetShowShortcutSchema.safeParse(key);
+  if (!result.success) return { success: false, shortcut: currentShowShortcut };
+
+  const ok = registerShowShortcut(result.data);
   if (ok) {
-    writeConfig({ showShortcut: key });
+    writeConfig({ showShortcut: result.data });
   }
   return { success: ok, shortcut: currentShowShortcut };
 });
@@ -139,44 +161,71 @@ ipcMain.handle("screen:capture", async () => {
 });
 
 // ── Smart paste via AppleScript (macOS) ──────────────────────────────────────
-ipcMain.handle("screen:paste-at", async (_, { x, y }: { x: number; y: number }) => {
+const PasteAtSchema = z.object({
+  x: z.number().int().min(0).max(10000),
+  y: z.number().int().min(0).max(10000),
+});
+
+ipcMain.handle("screen:paste-at", async (_, payload: unknown) => {
   if (process.platform !== "darwin") {
     return { success: false, error: "Auto-paste only supported on macOS currently." };
   }
+
+  const parseResult = PasteAtSchema.safeParse(payload);
+  if (!parseResult.success) {
+    return { success: false, error: "Invalid coordinates" };
+  }
+
+  const { x, y } = parseResult.data;
   const script = [
     `tell application "System Events"`,
-    `  click at {${Math.round(x)}, ${Math.round(y)}}`,
+    `  click at {${x}, ${y}}`,
     `  delay 0.3`,
     `  keystroke "a" using command down`,
     `  delay 0.1`,
     `  keystroke "v" using command down`,
     `end tell`,
   ].join("\n");
+
   return new Promise((resolve) => {
-    exec(`osascript << 'APPLESCRIPT'\n${script}\nAPPLESCRIPT`, (err) => {
-      if (err) {
-        console.error("screen:paste-at error:", err.message);
-        resolve({ success: false, error: err.message });
+    const child = spawn("osascript", ["-e", script]);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        console.error(`osascript exited with code ${code}`);
+        resolve({ success: false, error: `Process exited with code ${code}` });
       } else {
         resolve({ success: true });
       }
+    });
+    child.on("error", (err) => {
+      console.error("screen:paste-at error:", err.message);
+      resolve({ success: false, error: err.message });
     });
   });
 });
 
 // ── Clipboard write via pbcopy ───────────────────────────────────────────────
-ipcMain.handle("clipboard:write", async (_, text: string) => {
+const ClipboardWriteSchema = z.string().max(1000000); // 1MB limit for safety
+ipcMain.handle("clipboard:write", async (_, text: unknown) => {
   if (process.platform !== "darwin") return { success: false };
+
+  const result = ClipboardWriteSchema.safeParse(text);
+  if (!result.success) return { success: false, error: "Invalid text payload" };
+
   const tmp = join(tmpdir(), `vb_${Date.now()}.txt`);
   try {
-    writeFileSync(tmp, text, "utf8");
-    await new Promise<void>((resolve, reject) => {
-      exec(`cat "${tmp}" | pbcopy`, (err) => {
-        try { unlinkSync(tmp); } catch { /* ignore */ }
-        err ? reject(err) : resolve();
+    await fs.writeFile(tmp, result.data, "utf8");
+    return new Promise((resolve) => {
+      const child = spawn("bash", ["-c", `cat "${tmp}" | pbcopy`]);
+      child.on("close", async (code) => {
+        try { await fs.unlink(tmp); } catch { /* ignore */ }
+        resolve({ success: code === 0 });
+      });
+      child.on("error", async (err) => {
+        try { await fs.unlink(tmp); } catch { /* ignore */ }
+        resolve({ success: false, error: err.message });
       });
     });
-    return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -224,9 +273,17 @@ ipcMain.handle("updater:install", async () => {
       `rm -rf "${tmpExtract}"`,
     ].join("\n");
     const scriptPath = join(tmpdir(), "vb-updater.sh");
-    writeFileSync(scriptPath, script, "utf8");
-    exec(`chmod +x "${scriptPath}" && bash "${scriptPath}" &`);
-    app.quit();
+    try {
+      await fs.writeFile(scriptPath, script, { mode: 0o755, encoding: "utf8" });
+      const child = spawn("bash", [scriptPath], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+      app.quit();
+    } catch (err) {
+      console.error("Failed to launch updater script:", err);
+    }
   } else {
     // Windows: NSIS handles installs correctly
     autoUpdater.quitAndInstall(false, true);
@@ -235,8 +292,84 @@ ipcMain.handle("updater:install", async () => {
 
 ipcMain.handle("updater:get-version", () => app.getVersion());
 
+// ── Secure Storage IPC ───────────────────────────────────────────────────────
+const SECURE_STORAGE_DIR = join(app.getPath("userData"), "secure-storage");
+if (!existsSync(SECURE_STORAGE_DIR)) {
+  require("fs").mkdirSync(SECURE_STORAGE_DIR, { recursive: true });
+}
+
+const SecureStorageSchema = z.object({
+  key: z.string().regex(/^[a-z0-9_-]+$/),
+  value: z.string().optional(),
+});
+
+ipcMain.handle("secure-storage:set", async (_, payload: unknown) => {
+  const result = SecureStorageSchema.safeParse(payload);
+  if (!result.success || !result.data.value) return { success: false };
+
+  try {
+    const encrypted = safeStorage.encryptString(result.data.value);
+    const filePath = join(SECURE_STORAGE_DIR, result.data.key);
+    await fs.writeFile(filePath, encrypted);
+    return { success: true };
+  } catch (err) {
+    console.error("Secure storage write failed:", err);
+    return { success: false };
+  }
+});
+
+ipcMain.handle("secure-storage:get", async (_, payload: unknown) => {
+  const result = SecureStorageSchema.safeParse(payload);
+  if (!result.success) return null;
+
+  try {
+    const filePath = join(SECURE_STORAGE_DIR, result.data.key);
+    if (!existsSync(filePath)) return null;
+
+    const encrypted = await fs.readFile(filePath);
+    if (!safeStorage.isEncryptionAvailable()) return null;
+
+    return safeStorage.decryptString(encrypted);
+  } catch (err) {
+    console.error("Secure storage read failed:", err);
+    return null;
+  }
+});
+
+ipcMain.handle("secure-storage:remove", async (_, payload: unknown) => {
+  const result = SecureStorageSchema.omit({ value: true }).safeParse(payload);
+  if (!result.success) return { success: false };
+
+  try {
+    const filePath = join(SECURE_STORAGE_DIR, result.data.key);
+    if (existsSync(filePath)) {
+      await fs.unlink(filePath);
+    }
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+});
+
 // ── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  // ── Configure Fuses ────────────────────────────────────────────────────────
+  try {
+    flipFuses(process.execPath, {
+      version: FuseVersion.V1,
+      resetAdHocDarwinSignature: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: true,
+      [FuseV1Options.RunAsNode]: false,
+      [FuseV1Options.EnableCookieEncryption]: true,
+      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+      [FuseV1Options.EnableNodeCliInspectArguments]: false,
+      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+    });
+  } catch (err) {
+    console.error("Failed to flip fuses:", err);
+  }
+
   createWindow();
 
   // ── Auto-updater setup (production only) ──────────────────────────────────
@@ -292,13 +425,14 @@ app.whenReady().then(() => {
   }
 
   // Load persisted shortcut
-  const config = readConfig();
-  const ok = registerShowShortcut(config.showShortcut);
-  if (!ok) {
-    // Fallback if saved shortcut is now taken by another app
-    registerShowShortcut(DEFAULT_SHOW_SHORTCUT);
-    writeConfig({ showShortcut: DEFAULT_SHOW_SHORTCUT });
-  }
+  readConfig().then((config) => {
+    const ok = registerShowShortcut(config.showShortcut);
+    if (!ok) {
+      // Fallback if saved shortcut is now taken by another app
+      registerShowShortcut(DEFAULT_SHOW_SHORTCUT);
+      writeConfig({ showShortcut: DEFAULT_SHOW_SHORTCUT });
+    }
+  });
 
   // Minimise / restore
   globalShortcut.register("CommandOrControl+Shift+M", () => {
